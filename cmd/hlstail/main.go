@@ -18,7 +18,7 @@ func main() {
 	app.Usage = "Query and HLS playlist and then tail the new segments of a selected variant"
 
 	app.Action = func(c *cli.Context) error {
-		return tail(c.String("playlist"), c.Int("count"))
+		return tail(c.String("playlist"), c.Int("count"), c.Int("interval"))
 	}
 
 	app.Flags = []cli.Flag{
@@ -32,6 +32,11 @@ func main() {
 			Usage: "The number of segments to display",
 			Value: 5,
 		},
+		cli.IntFlag{
+			Name:  "interval",
+			Usage: "The number of seconds to wait between updates",
+			Value: 3,
+		},
 	}
 
 	err := app.Run(os.Args)
@@ -41,7 +46,7 @@ func main() {
 	}
 }
 
-func tail(playlist string, count int) error {
+func tail(playlist string, count int, interval int) error {
 	// Create a new HLS Session to manage the requests.
 	hls := tools.NewHLSSession(playlist)
 
@@ -79,6 +84,6 @@ func tail(playlist string, count int) error {
 		tools.PrintBuffer(variantInfo)
 
 		// Wait to get the next update.
-		time.Sleep(3 * time.Second)
+		time.Sleep(interval * time.Second)
 	}
 }
