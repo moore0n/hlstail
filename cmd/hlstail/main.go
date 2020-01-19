@@ -84,6 +84,6 @@ func tail(playlist string, count int, interval int) error {
 		tools.PrintBuffer(variantInfo)
 
 		// Wait to get the next update.
-		time.Sleep(interval * time.Second)
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
