@@ -1,14 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/moore0n/hlstail/pkg/tools"
 	"github.com/urfave/cli"
 )
+
+type appState struct {
+	Paused bool
+}
 
 func main() {
 	app := cli.NewApp()
@@ -77,13 +83,67 @@ func tail(playlist string, count int, interval int) error {
 	// Set the variant that was selected in the previous loop.
 	hls.SetVariant(selectedOption)
 
+	state := &appState{
+		Paused: false,
+	}
+
+	go updateLoop(state, interval, count, hls)
+
+	checkForPause(state)
+
+	return nil
+}
+
+func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession) {
+	var variantInfo string
+	var nextRun int64 = time.Now().Unix()
+	var lastPauseState bool = state.Paused
+
 	// Loop forever and request updates every n number of seconds.
 	for {
-		variantInfo := hls.GetVariantPrintData(count)
 
-		tools.PrintBuffer(variantInfo)
+		if nextRun > time.Now().Unix() && lastPauseState == state.Paused {
+			lastPauseState = state.Paused
+			continue
+		}
 
-		// Wait to get the next update.
-		time.Sleep(time.Duration(interval) * time.Second)
+		if !state.Paused {
+			variantInfo = hls.GetVariantPrintData(count)
+			tools.PrintBuffer(variantInfo)
+		} else {
+			width := tools.GetCliWidth()
+			parts := strings.Split(variantInfo, "\n")
+			end := parts[len(parts)-2]
+			end = strings.ReplaceAll(end, "=", "")
+
+			end = fmt.Sprintf("PAUSED @%s", end)
+
+			parts[len(parts)-2] = tools.PadString(end, width, "=")
+
+			tools.PrintBuffer(strings.Join(parts, "\n"))
+		}
+
+		lastPauseState = state.Paused
+		nextRun = time.Now().Unix() + int64(interval)
+	}
+}
+
+func checkForPause(state *appState) {
+	// Read the std input
+	reader := bufio.NewReader(os.Stdin)
+
+	// Loop and read the input waiting for keyboard input
+	for {
+		r, err := reader.ReadString('\n')
+
+		if err != nil {
+			break
+		}
+
+		r = strings.ReplaceAll(r, "\n", "")
+
+		if r == " " || r == "" {
+			state.Paused = !state.Paused
+		}
 	}
 }
