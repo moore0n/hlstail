@@ -24,8 +24,8 @@ GLOBAL OPTIONS:
 
 ## Install 
 ```
-go get -u github.com/moore0n/hlstail
-go install github.com/moore0n/hlstail
+go get -u github.com/moore0n/hlstail/...
+go install github.com/moore0n/hlstail/...
 ```
 
 ## Build
