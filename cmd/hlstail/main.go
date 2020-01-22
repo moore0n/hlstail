@@ -21,18 +21,23 @@ func main() {
 	app.Name = "hlstail"
 	app.Version = "1.0.0"
 
-	app.Usage = "Query and HLS playlist and then tail the new segments of a selected variant"
+	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
+
+	app.UsageText = "[playlist]"
 
 	app.Action = func(c *cli.Context) error {
-		return tail(c.String("playlist"), c.Int("count"), c.Int("interval"))
+
+		playlist := c.Args().Get(0)
+
+		// Validate that we have a playlist value.
+		if len(playlist) == 0 {
+			cli.ShowAppHelpAndExit(c, 0)
+		}
+
+		return tail(playlist, c.Int("count"), c.Int("interval"))
 	}
 
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:     "playlist",
-			Usage:    "The url of the master playlist",
-			Required: true,
-		},
 		cli.IntFlag{
 			Name:  "count",
 			Usage: "The number of segments to display",
@@ -94,6 +99,7 @@ func tail(playlist string, count int, interval int) error {
 	return nil
 }
 
+// updateLoop will query for updates at the supplied interval
 func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession) {
 	var variantInfo string
 	var nextRun int64 = time.Now().Unix()
@@ -111,6 +117,9 @@ func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession)
 			variantInfo = hls.GetVariantPrintData(count)
 			tools.PrintBuffer(variantInfo)
 		} else {
+
+			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
+			if lastPauseState != state.Paused {
 			width := tools.GetCliWidth()
 			parts := strings.Split(variantInfo, "\n")
 			end := parts[len(parts)-2]
@@ -122,12 +131,14 @@ func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession)
 
 			tools.PrintBuffer(strings.Join(parts, "\n"))
 		}
+		}
 
 		lastPauseState = state.Paused
 		nextRun = time.Now().Unix() + int64(interval)
 	}
 }
 
+// checkForPause will query the stdin to determine if someone has hit return to pause the tailing.
 func checkForPause(state *appState) {
 	// Read the std input
 	reader := bufio.NewReader(os.Stdin)
