@@ -16,8 +16,8 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --playlist value  The url of the master playlist
    --count value     The number of segments to display (default: 5)
+   --interval value  The number of seconds to wait between updates (default: 3)
    --help, -h        show help
    --version, -v     print the version
 ```
@@ -26,6 +26,11 @@ GLOBAL OPTIONS:
 ```
 go get -u github.com/moore0n/hlstail
 go install github.com/moore0n/hlstail/...
+```
+
+## Try
+```
+hlstail --count 10 --interval 3 http://qthttp.apple.com.edgesuite.net/1010qwoeiuryfg/sl.m3u8
 ```
 
 ## Build

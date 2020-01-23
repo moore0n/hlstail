@@ -108,6 +108,9 @@ func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession)
 	// Loop forever and request updates every n number of seconds.
 	for {
 
+		// Prevent maxing out the CPU.
+		time.Sleep(time.Millisecond * 250)
+
 		if nextRun > time.Now().Unix() && lastPauseState == state.Paused {
 			lastPauseState = state.Paused
 			continue
