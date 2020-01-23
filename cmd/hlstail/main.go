@@ -19,7 +19,7 @@ type appState struct {
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.0"
+	app.Version = "1.0.1"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
@@ -123,17 +123,17 @@ func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession)
 
 			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
 			if lastPauseState != state.Paused {
-			width := tools.GetCliWidth()
-			parts := strings.Split(variantInfo, "\n")
-			end := parts[len(parts)-2]
-			end = strings.ReplaceAll(end, "=", "")
+				width := tools.GetCliWidth()
+				parts := strings.Split(variantInfo, "\n")
+				end := parts[len(parts)-2]
+				end = strings.ReplaceAll(end, "=", "")
 
-			end = fmt.Sprintf("PAUSED @%s", end)
+				end = fmt.Sprintf("PAUSED @%s", end)
 
-			parts[len(parts)-2] = tools.PadString(end, width, "=")
+				parts[len(parts)-2] = tools.PadString(end, width, "=")
 
-			tools.PrintBuffer(strings.Join(parts, "\n"))
-		}
+				tools.PrintBuffer(strings.Join(parts, "\n"))
+			}
 		}
 
 		lastPauseState = state.Paused
