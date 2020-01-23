@@ -4,10 +4,10 @@ hlstail is a simple CLI tool for tailing a specific variant of an HLS playlist
 # Usage
 ```
 NAME:
-   hlstail - Query an HLS playlist and then tail the new segments of a variant
+   hlstail - Query an HLS playlist and then tail the new segments of a selected variant
 
 USAGE:
-   main [global options] command [command options] [arguments...]
+   [playlist]
 
 VERSION:
    1.0.0
