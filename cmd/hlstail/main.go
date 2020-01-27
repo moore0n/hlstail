@@ -34,7 +34,7 @@ func main() {
 			cli.ShowAppHelpAndExit(c, 0)
 		}
 
-		return tail(playlist, c.Int("count"), c.Int("interval"))
+		return tail(playlist, c.Int("count"), c.Int("interval"), c.Int("variant"))
 	}
 
 	app.Flags = []cli.Flag{
@@ -48,6 +48,11 @@ func main() {
 			Usage: "The number of seconds to wait between updates",
 			Value: 3,
 		},
+		cli.IntFlag{
+			Name:  "variant",
+			Usage: "The number of the variant you'd like to use",
+			Value: 0,
+		},
 	}
 
 	err := app.Run(os.Args)
@@ -57,36 +62,38 @@ func main() {
 	}
 }
 
-func tail(playlist string, count int, interval int) error {
+func tail(playlist string, count int, interval int, variant int) error {
 	// Create a new HLS Session to manage the requests.
 	hls := tools.NewHLSSession(playlist)
 
 	// Get the Master and return the variant list.
 	content, size := hls.GetMasterPlaylistOptions()
 
-	// Show the variant list to the user
-	tools.PrintBuffer(content)
+	if variant == 0 {
 
-	var selectedOption int
+		// Show the variant list to the user
+		tools.PrintBuffer(content)
 
-	// Loop until we have a valid option for a variant to tail.
-	for {
-		// Get which variant they want to tail.
-		index, err := tools.GetOption()
+		// Loop until we have a valid option for a variant to tail.
+		for {
+			// Get which variant they want to tail.
+			index, err := tools.GetOption()
 
-		if err != nil || index > size || index < 1 {
-			errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
-			tools.PrintBuffer(errMsg)
-			continue
+			if err != nil || index > size || index < 1 {
+				errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
+				tools.PrintBuffer(errMsg)
+				continue
+			}
+
+			variant = index - 1
+
+			break
 		}
 
-		selectedOption = index - 1
-
-		break
 	}
 
 	// Set the variant that was selected in the previous loop.
-	hls.SetVariant(selectedOption)
+	hls.SetVariant(variant)
 
 	state := &appState{
 		Paused: false,
