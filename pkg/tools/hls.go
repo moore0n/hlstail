@@ -186,10 +186,16 @@ func (sess *HLSSession) buildSegmentList(rawData string) [][]string {
 
 // exists Check if the elem exists in the prev list.
 func exists(prev [][]string, elem []string) bool {
-	elemJoined := strings.Join(elem, "")
+	const ignoredUpdate = "(#EXT-X-PROGRAM-DATE-TIME.*)$"
+	const ignoreSequence = "(#EXT-X-MEDIA-SEQUENCE:.*)$"
+	elemJoined := strings.Join(elem, "\n")
+	elemJoined = strings.ReplaceAll(elemJoined, ignoredUpdate, "")
+	elemJoined = strings.ReplaceAll(elemJoined, ignoreSequence, "")
 
 	for i := 0; i < len(prev); i++ {
-		seg := strings.Join(prev[i], "")
+		seg := strings.Join(prev[i], "\n")
+		seg = strings.ReplaceAll(seg, ignoredUpdate, "")
+		seg = strings.ReplaceAll(seg, ignoreSequence, "")
 
 		if seg == elemJoined {
 			return true
