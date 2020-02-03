@@ -89,7 +89,7 @@ func GetCliWidth() int {
 	out, err := cmd.Output()
 
 	if err != nil {
-		fmt.Println("Error : ", err.Error())
+		fmt.Println("Error getting cli width: ", err.Error())
 		os.Exit(1)
 	}
 
@@ -100,7 +100,7 @@ func GetCliWidth() int {
 	width, err := strconv.Atoi(rawWidth)
 
 	if err != nil {
-		fmt.Println("Error : ", err.Error())
+		fmt.Println("Error parsing width : ", err.Error())
 		os.Exit(1)
 	}
 
