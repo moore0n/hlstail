@@ -186,15 +186,30 @@ func (sess *HLSSession) buildSegmentList(rawData string) [][]string {
 
 // exists Check if the elem exists in the prev list.
 func exists(prev [][]string, elem []string) bool {
-	elemJoined := strings.Join(elem, "")
+	currentSegmentSource := filterSegmentSource(elem)
+
+	// If there was an issue getting the source just return false
+	if currentSegmentSource == "" {
+		return false
+	}
 
 	for i := 0; i < len(prev); i++ {
-		seg := strings.Join(prev[i], "")
+		prevSegmentSource := filterSegmentSource(prev[i])
 
-		if seg == elemJoined {
+		if currentSegmentSource == prevSegmentSource {
 			return true
 		}
 	}
 
 	return false
+}
+
+func filterSegmentSource(segment []string) string {
+	for _, val := range segment {
+		if strings.Index(val, "#") < 0 {
+			return val
+		}
+	}
+
+	return ""
 }
