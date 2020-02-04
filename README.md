@@ -1,4 +1,6 @@
-![Tag](https://github.com/moore0n/hlstail/workflows/Tag/badge.svg?branch=master&event=release)
+![Tag](https://img.shields.io/github/v/tag/moore0n/hlstail?sort=date)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/moore0n/hlstail)
+![GitHub stars](https://img.shields.io/github/stars/moore0n/hlstail?style=social)
 
 # hlstail
 hlstail is a simple CLI tool for tailing a specific variant of an HLS playlist
