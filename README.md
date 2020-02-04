@@ -10,7 +10,7 @@ USAGE:
    [playlist]
 
 VERSION:
-   1.0.0
+   1.0.3
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -18,6 +18,7 @@ COMMANDS:
 GLOBAL OPTIONS:
    --count value     The number of segments to display (default: 5)
    --interval value  The number of seconds to wait between updates (default: 3)
+   --variant value   The number of the variant you'd like to use (default: 0)
    --help, -h        show help
    --version, -v     print the version
 ```
@@ -36,5 +37,6 @@ hlstail --count 10 --interval 3 http://qthttp.apple.com.edgesuite.net/1010qwoeiu
 ## Build
 If you so choose you can build a binary locally using the supplied build command.
 ```
-make binary
+$make mac
+$make linux
 ```

@@ -1,0 +1,17 @@
+name: Tag
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps: 
+    - uses: actions/checkout@master
+    - name: Bump version and push Tag
+      uses: wiktorj/github-tag-action@2.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        WITH_V: true
