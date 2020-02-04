@@ -1,6 +1,6 @@
-![Tag](https://img.shields.io/github/v/tag/moore0n/hlstail?sort=date)
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/moore0n/hlstail)
-![GitHub stars](https://img.shields.io/github/stars/moore0n/hlstail?style=social)
+[![Tag](https://img.shields.io/github/v/tag/moore0n/hlstail?sort=date)](https://github.com/moore0n/hlstail/releases)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/moore0n/hlstail)](https://golang.org/dl/)
+[![GitHub stars](https://img.shields.io/github/stars/moore0n/hlstail?style=social)](https://github.com/moore0n/hlstail/stargazers)
 
 # hlstail
 hlstail is a simple CLI tool for tailing a specific variant of an HLS playlist
