@@ -1,3 +1,5 @@
+![Tag](https://github.com/moore0n/hlstail/workflows/Tag/badge.svg?branch=master&event=release)
+
 # hlstail
 hlstail is a simple CLI tool for tailing a specific variant of an HLS playlist
 
