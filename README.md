@@ -41,6 +41,6 @@ hlstail --count 10 --interval 3 http://qthttp.apple.com.edgesuite.net/1010qwoeiu
 ## Build
 If you so choose you can build a binary locally using the supplied build command.
 ```
-$make mac
-$make linux
+$ make mac
+$ make linux
 ```
