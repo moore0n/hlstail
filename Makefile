@@ -1,9 +1,8 @@
-.PHONY: binary-mac, binary-linux
+default: 
+	@echo "Select a target of \"mac\" or \"linux\""
+.PHONY: default
 
-binary-mac:
-	GOARCH=amd64 GOOS=darwin go build -o ./hlstail ./cmd/hlstail/main.go
-
-binary-linux:
-	GOARCH=amd64 GOOS=linux go build -o ./hlstail ./cmd/hlstail/main.go
-
-	// TODO: Add windows build?
+mac:
+	@GOARCH=amd64 GOOS=darwin go build -o ./hlstail ./cmd/hlstail/main.go
+linux:
+	@GOARCH=amd64 GOOS=linux go build -o ./hlstail ./cmd/hlstail/main.go

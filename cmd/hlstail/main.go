@@ -19,7 +19,7 @@ type appState struct {
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.1"
+	app.Version = "1.0.3"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
