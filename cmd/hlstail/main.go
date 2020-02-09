@@ -1,20 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/moore0n/hlstail/pkg/session"
 	"github.com/moore0n/hlstail/pkg/tools"
 	"github.com/urfave/cli"
 )
-
-type appState struct {
-	Paused bool
-}
 
 func main() {
 	app := cli.NewApp()
@@ -63,11 +59,23 @@ func main() {
 }
 
 func tail(playlist string, count int, interval int, variant int) error {
+
+	sess := session.NewSession()
+
+	if err := sess.MakeRaw(); err != nil {
+		return err
+	}
+
+	// Start the new terminal session
+	sess.Start()
+
+	width := sess.GetCliWidth()
+
 	// Create a new HLS Session to manage the requests.
 	hls := tools.NewHLSSession(playlist)
 
 	// Get the Master and return the variant list.
-	content, size := hls.GetMasterPlaylistOptions()
+	content, size := hls.GetMasterPlaylistOptions(width)
 
 	if variant == 0 {
 
@@ -77,12 +85,18 @@ func tail(playlist string, count int, interval int, variant int) error {
 		// Loop until we have a valid option for a variant to tail.
 		for {
 			// Get which variant they want to tail.
-			index, err := tools.GetOption()
+			index, err := tools.GetOption(sess)
 
-			if err != nil || index > size || index < 1 {
+			if err != nil || index > size || index == 0 {
 				errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
 				tools.PrintBuffer(errMsg)
 				continue
+			}
+
+			// Handle the quit case.
+			if index == -1 {
+				sess.End()
+				return nil
 			}
 
 			variant = index - 1
@@ -95,22 +109,20 @@ func tail(playlist string, count int, interval int, variant int) error {
 	// Set the variant that was selected in the previous loop.
 	hls.SetVariant(variant)
 
-	state := &appState{
-		Paused: false,
-	}
+	// Run the updates in a go routine but respect the pause state.
+	go updateLoop(sess, interval, count, hls)
 
-	go updateLoop(state, interval, count, hls)
-
-	checkForPause(state)
+	// Run the loop to poll input for pause.
+	tools.CheckForPause(sess)
 
 	return nil
 }
 
 // updateLoop will query for updates at the supplied interval
-func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession) {
+func updateLoop(sess *session.Session, interval int, count int, hls *tools.HLSSession) {
 	var variantInfo string
 	var nextRun int64 = time.Now().Unix()
-	var lastPauseState bool = state.Paused
+	var lastPauseState bool = sess.Paused
 
 	// Loop forever and request updates every n number of seconds.
 	for {
@@ -118,53 +130,36 @@ func updateLoop(state *appState, interval int, count int, hls *tools.HLSSession)
 		// Prevent maxing out the CPU.
 		time.Sleep(time.Millisecond * 250)
 
-		if nextRun > time.Now().Unix() && lastPauseState == state.Paused {
-			lastPauseState = state.Paused
+		if nextRun > time.Now().Unix() && lastPauseState == sess.Paused {
+			lastPauseState = sess.Paused
 			continue
 		}
 
-		if !state.Paused {
-			variantInfo = hls.GetVariantPrintData(count)
+		if !sess.Paused {
+			width := sess.GetCliWidth()
+			variantInfo = hls.GetVariantPrintData(width, count)
 			tools.PrintBuffer(variantInfo)
 		} else {
 
 			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
-			if lastPauseState != state.Paused {
-				width := tools.GetCliWidth()
-				parts := strings.Split(variantInfo, "\n")
-				end := parts[len(parts)-2]
+			if lastPauseState != sess.Paused {
+				width := sess.GetCliWidth()
+				parts := strings.Split(variantInfo, "\r\n")
+				end := parts[len(parts)-4]
 				end = strings.ReplaceAll(end, "=", "")
+
+				end = strings.Trim(end, " ")
 
 				end = fmt.Sprintf("PAUSED @%s", end)
 
-				parts[len(parts)-2] = tools.PadString(end, width, "=")
+				parts[len(parts)-4] = tools.PadString(end, width, "=")
 
-				tools.PrintBuffer(strings.Join(parts, "\n"))
+				// Trim the pause instructions.
+				tools.PrintBuffer(strings.Join(parts, "\r\n"))
 			}
 		}
 
-		lastPauseState = state.Paused
+		lastPauseState = sess.Paused
 		nextRun = time.Now().Unix() + int64(interval)
-	}
-}
-
-// checkForPause will query the stdin to determine if someone has hit return to pause the tailing.
-func checkForPause(state *appState) {
-	// Read the std input
-	reader := bufio.NewReader(os.Stdin)
-
-	// Loop and read the input waiting for keyboard input
-	for {
-		r, err := reader.ReadString('\n')
-
-		if err != nil {
-			break
-		}
-
-		r = strings.ReplaceAll(r, "\n", "")
-
-		if r == " " || r == "" {
-			state.Paused = !state.Paused
-		}
 	}
 }
