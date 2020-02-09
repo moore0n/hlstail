@@ -1,14 +1,17 @@
 # github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
 github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/ingest/manifest v0.0.0-20190812004131-f98280a4b8c1
+github.com/ingest/manifest
 github.com/ingest/manifest/hls
 github.com/ingest/manifest/hls/source
-github.com/ingest/manifest
-# github.com/pkg/errors v0.8.1
-github.com/pkg/errors
 # github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
 # github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/urfave/cli v1.22.2
 github.com/urfave/cli
+# golang.org/x/crypto v0.0.0-20200207205829-a95e85b341fd
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/sys v0.0.0-20190412213103-97732733099d
+golang.org/x/sys/unix
+golang.org/x/sys/windows
