@@ -4,20 +4,19 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/moore0n/hlstail/pkg/session"
 )
 
-// PrintBuffer prints the string to stdout
-func PrintBuffer(text string) {
-	fmt.Printf("\033[2J\033[1;1H%s\n", text)
+// PrintBuffer prints the value of val to stdout
+func PrintBuffer(val interface{}) {
+	fmt.Printf("\033[1;1H\033[0J%v", val)
 }
 
 // GetOption returns a selected option from stdin
-func GetOption() (int, error) {
+func GetOption(sess *session.Session) (int, error) {
 	option := 0
 
 	// Read the std input
@@ -25,38 +24,37 @@ func GetOption() (int, error) {
 
 	// Loop and read the input waiting for keyboard input
 	for {
-		input, err := read(reader)
-
-		if input == "" {
-			continue
-		}
+		r, _, err := reader.ReadRune()
 
 		if err != nil {
 			return option, err
 		}
 
-		// Replace the new line character
-		input = strings.TrimRight(input, "\n")
+		/**
+		* Ignore the escape sequence that could come back in the read rune.
+		* 27 == ESC
+		* 91 == [
+		 */
+		if r == rune(27) || r == rune(91) {
+			continue
+		}
 
-		if option, err = strconv.Atoi(input); err != nil {
-			return option, err
+		switch r {
+		case rune(113):
+			// (q)uit
+			sess.End()
+			os.Exit(0)
+		}
+
+		// If the value provided is not an int continue until a valid value is provided.
+		if option, err = strconv.Atoi(string(r)); err != nil {
+			continue
 		}
 
 		break
 	}
 
 	return option, nil
-}
-
-// Read a line from the buffer
-func read(r *bufio.Reader) (string, error) {
-	text, err := r.ReadString('\n')
-
-	if err != nil {
-		return "", errors.Wrap(err, "Error reading from stdin")
-	}
-
-	return text, nil
 }
 
 // PadString returns a new padded string
@@ -78,31 +76,42 @@ func PadString(content string, width int, char string) string {
 
 	padding := strings.Join(rawPadding, "")
 
-	return fmt.Sprintf("%s%s%s\n", padding, content, padding)
+	return fmt.Sprintf("%s%s%s", padding, content, padding)
 }
 
-// GetCliWidth returns the available screen space
-func GetCliWidth() int {
-	cmd := exec.Command("stty", "size")
-	cmd.Stdin = os.Stdin
+// CheckForPause will query the stdin to determine if someone has hit return to pause the tailing.
+func CheckForPause(sess *session.Session) {
+	// Read the std input
+	reader := bufio.NewReader(os.Stdin)
 
-	out, err := cmd.Output()
+	// Loop and read the input waiting for keyboard input
+	for {
+		r, _, err := reader.ReadRune()
 
-	if err != nil {
-		fmt.Println("Error getting cli width: ", err.Error())
-		os.Exit(1)
+		if err != nil {
+			break
+		}
+
+		/**
+		* Ignore the escape sequence that could come back in the read rune.
+		* 27 == ESC
+		* 91 == [
+		 */
+		if r == rune(27) || r == rune(91) {
+			continue
+		}
+
+		switch r {
+		case rune(112):
+			// (p)ause
+			sess.Paused = true
+		case rune(114):
+			// (r)esume
+			sess.Paused = false
+		case rune(113):
+			// (q)uit
+			sess.End()
+			os.Exit(0)
+		}
 	}
-
-	parts := strings.Split(string(out), " ")
-
-	rawWidth := strings.ReplaceAll(parts[1], "\n", "")
-
-	width, err := strconv.Atoi(rawWidth)
-
-	if err != nil {
-		fmt.Println("Error parsing width : ", err.Error())
-		os.Exit(1)
-	}
-
-	return width
 }

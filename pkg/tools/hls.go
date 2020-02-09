@@ -33,9 +33,7 @@ func NewHLSSession(URL string) *HLSSession {
 }
 
 // GetMasterPlaylistOptions return the possible playlist options.
-func (sess *HLSSession) GetMasterPlaylistOptions() (string, int) {
-	cliWidth := GetCliWidth()
-
+func (sess *HLSSession) GetMasterPlaylistOptions(width int) (string, int) {
 	var err error
 
 	sess.Master, err = sess.Source.Master(context.Background(), sess.URL)
@@ -48,8 +46,8 @@ func (sess *HLSSession) GetMasterPlaylistOptions() (string, int) {
 
 	variantURLs := new(bytes.Buffer)
 
-	fmt.Fprint(variantURLs, PadString("Potential Variants", cliWidth, "="))
-	fmt.Fprint(variantURLs, PadString("", cliWidth+2, " "))
+	fmt.Fprint(variantURLs, PadString("[hlstail] Select a variant", width, "="), "\r\n")
+	fmt.Fprint(variantURLs, PadString("", width+2, " "), "\r\n")
 	for i, variant := range sess.Master.Variants {
 		if url, err := variant.AbsoluteURL(); err == nil {
 			res := variant.Resolution
@@ -58,12 +56,13 @@ func (sess *HLSSession) GetMasterPlaylistOptions() (string, int) {
 				res = "audio-only"
 			}
 
-			fmt.Fprintf(variantURLs, "%d) %s - %s -> %s\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), url)
+			fmt.Fprintf(variantURLs, "%d) %s - %s -> %s\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), url)
 		}
 	}
 
-	fmt.Fprint(variantURLs, PadString("", cliWidth+2, " "))
-	fmt.Fprint(variantURLs, PadString("", cliWidth+2, "="))
+	fmt.Fprint(variantURLs, PadString("", width+2, " "), "\r\n")
+	fmt.Fprint(variantURLs, PadString("", width+2, "="), "\r\n")
+	fmt.Fprint(variantURLs, "\r\nactions: (q)uit \r\n")
 
 	return variantURLs.String(), len(sess.Master.Variants)
 }
@@ -99,10 +98,7 @@ func (sess *HLSSession) GetRawVariantData() (string, error) {
 }
 
 // GetVariantPrintData return the last n segments of a variant.
-func (sess *HLSSession) GetVariantPrintData(count int) string {
-
-	cliWidth := GetCliWidth()
-
+func (sess *HLSSession) GetVariantPrintData(width int, count int) string {
 	rawData, err := sess.GetRawVariantData()
 
 	if err != nil {
@@ -124,8 +120,8 @@ func (sess *HLSSession) GetVariantPrintData(count int) string {
 
 	segmentData := new(bytes.Buffer)
 
-	fmt.Fprint(segmentData, PadString("Segment Data", cliWidth, "="))
-	fmt.Fprint(segmentData, PadString("", cliWidth+2, " "))
+	fmt.Fprint(segmentData, PadString("[hlstail] Segment Data", width, "="))
+	fmt.Fprint(segmentData, PadString("", width+2, " "))
 
 	// Check the segments and colorize the new segments.
 	for i := 0; i < len(segments); i++ {
@@ -138,14 +134,15 @@ func (sess *HLSSession) GetVariantPrintData(count int) string {
 			color = "\033[38;5;250m"
 		}
 
-		fmt.Fprintf(segmentData, "%s%s\033[0m\n\n", color, strings.Join(segments[i], "\n"))
+		fmt.Fprintf(segmentData, "%s%s\033[0m\r\n", color, strings.Join(segments[i], "\r\n"))
 	}
 
 	now := time.Now()
 	now = now.UTC()
 
-	fmt.Fprint(segmentData, PadString("", cliWidth+2, " "))
-	fmt.Fprintf(segmentData, PadString(now.Format(time.RFC3339), cliWidth, "="))
+	fmt.Fprint(segmentData, PadString("", width+2, " "), "\r\n")
+	fmt.Fprint(segmentData, PadString(now.Format(time.RFC3339), width, "="), "\r\n")
+	fmt.Fprint(segmentData, "\r\nactions: (q)uit (p)ause (r)esume \r\n")
 
 	sess.PreviousSegments = segments
 
