@@ -15,7 +15,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.3"
+	app.Version = "1.0.4"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
