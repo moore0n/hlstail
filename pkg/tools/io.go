@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/moore0n/hlstail/pkg/session"
+	"github.com/moore0n/hlstail/pkg/term"
 )
 
 // PrintBuffer prints the value of val to stdout
@@ -16,7 +16,7 @@ func PrintBuffer(val interface{}) {
 }
 
 // GetOption returns a selected option from stdin
-func GetOption(sess *session.Session) (int, error) {
+func GetOption(termSess *term.Session) (int, error) {
 	option := 0
 
 	// Read the std input
@@ -42,7 +42,7 @@ func GetOption(sess *session.Session) (int, error) {
 		switch r {
 		case rune(113):
 			// (q)uit
-			sess.End()
+			termSess.End()
 			os.Exit(0)
 		}
 
@@ -80,7 +80,7 @@ func PadString(content string, width int, char string) string {
 }
 
 // CheckForPause will query the stdin to determine if someone has hit return to pause the tailing.
-func CheckForPause(sess *session.Session) {
+func CheckForPause(termSess *term.Session) {
 	// Read the std input
 	reader := bufio.NewReader(os.Stdin)
 
@@ -104,13 +104,13 @@ func CheckForPause(sess *session.Session) {
 		switch r {
 		case rune(112):
 			// (p)ause
-			sess.Paused = true
+			termSess.Paused = true
 		case rune(114):
 			// (r)esume
-			sess.Paused = false
+			termSess.Paused = false
 		case rune(113):
 			// (q)uit
-			sess.End()
+			termSess.End()
 			os.Exit(0)
 		}
 	}

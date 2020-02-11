@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moore0n/hlstail/pkg/session"
+	"github.com/moore0n/hlstail/pkg/hls"
+	"github.com/moore0n/hlstail/pkg/term"
 	"github.com/moore0n/hlstail/pkg/tools"
 	"github.com/urfave/cli"
 )
@@ -15,7 +16,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.4"
+	app.Version = "1.0.5"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
@@ -60,19 +61,19 @@ func main() {
 
 func tail(playlist string, count int, interval int, variant int) error {
 
-	sess := session.NewSession()
+	termSess := term.NewSession()
 
-	if err := sess.MakeRaw(); err != nil {
+	if err := termSess.MakeRaw(); err != nil {
 		return err
 	}
 
 	// Start the new terminal session
-	sess.Start()
+	termSess.Start()
 
-	width := sess.GetCliWidth()
+	width := termSess.GetCliWidth()
 
 	// Create a new HLS Session to manage the requests.
-	hls := tools.NewHLSSession(playlist)
+	hls := hls.NewSession(termSess, playlist)
 
 	// Get the Master and return the variant list.
 	content, size := hls.GetMasterPlaylistOptions(width)
@@ -85,7 +86,7 @@ func tail(playlist string, count int, interval int, variant int) error {
 		// Loop until we have a valid option for a variant to tail.
 		for {
 			// Get which variant they want to tail.
-			index, err := tools.GetOption(sess)
+			index, err := tools.GetOption(termSess)
 
 			if err != nil || index > size || index == 0 {
 				errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
@@ -95,7 +96,7 @@ func tail(playlist string, count int, interval int, variant int) error {
 
 			// Handle the quit case.
 			if index == -1 {
-				sess.End()
+				termSess.End()
 				return nil
 			}
 
@@ -110,19 +111,19 @@ func tail(playlist string, count int, interval int, variant int) error {
 	hls.SetVariant(variant)
 
 	// Run the updates in a go routine but respect the pause state.
-	go updateLoop(sess, interval, count, hls)
+	go updateLoop(termSess, interval, count, hls)
 
 	// Run the loop to poll input for pause.
-	tools.CheckForPause(sess)
+	tools.CheckForPause(termSess)
 
 	return nil
 }
 
 // updateLoop will query for updates at the supplied interval
-func updateLoop(sess *session.Session, interval int, count int, hls *tools.HLSSession) {
+func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Session) {
 	var variantInfo string
 	var nextRun int64 = time.Now().Unix()
-	var lastPauseState bool = sess.Paused
+	var lastPauseState bool = termSess.Paused
 
 	// Loop forever and request updates every n number of seconds.
 	for {
@@ -130,20 +131,20 @@ func updateLoop(sess *session.Session, interval int, count int, hls *tools.HLSSe
 		// Prevent maxing out the CPU.
 		time.Sleep(time.Millisecond * 250)
 
-		if nextRun > time.Now().Unix() && lastPauseState == sess.Paused {
-			lastPauseState = sess.Paused
+		if nextRun > time.Now().Unix() && lastPauseState == termSess.Paused {
+			lastPauseState = termSess.Paused
 			continue
 		}
 
-		if !sess.Paused {
-			width := sess.GetCliWidth()
+		if !termSess.Paused {
+			width := termSess.GetCliWidth()
 			variantInfo = hls.GetVariantPrintData(width, count)
 			tools.PrintBuffer(variantInfo)
 		} else {
 
 			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
-			if lastPauseState != sess.Paused {
-				width := sess.GetCliWidth()
+			if lastPauseState != termSess.Paused {
+				width := termSess.GetCliWidth()
 				parts := strings.Split(variantInfo, "\r\n")
 				end := parts[len(parts)-4]
 				end = strings.ReplaceAll(end, "=", "")
@@ -159,7 +160,7 @@ func updateLoop(sess *session.Session, interval int, count int, hls *tools.HLSSe
 			}
 		}
 
-		lastPauseState = sess.Paused
+		lastPauseState = termSess.Paused
 		nextRun = time.Now().Unix() + int64(interval)
 	}
 }
