@@ -14,7 +14,7 @@ USAGE:
    [playlist]
 
 VERSION:
-   1.0.4
+   1.0.5
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command

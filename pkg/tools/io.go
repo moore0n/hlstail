@@ -2,12 +2,13 @@ package tools
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/moore0n/hlstail/pkg/session"
+	"github.com/moore0n/hlstail/pkg/term"
 )
 
 // PrintBuffer prints the value of val to stdout
@@ -16,7 +17,7 @@ func PrintBuffer(val interface{}) {
 }
 
 // GetOption returns a selected option from stdin
-func GetOption(sess *session.Session) (int, error) {
+func GetOption(termSess *term.Session) (int, error) {
 	option := 0
 
 	// Read the std input
@@ -42,7 +43,7 @@ func GetOption(sess *session.Session) (int, error) {
 		switch r {
 		case rune(113):
 			// (q)uit
-			sess.End()
+			termSess.End()
 			os.Exit(0)
 		}
 
@@ -79,8 +80,34 @@ func PadString(content string, width int, char string) string {
 	return fmt.Sprintf("%s%s%s", padding, content, padding)
 }
 
-// CheckForPause will query the stdin to determine if someone has hit return to pause the tailing.
-func CheckForPause(sess *session.Session) {
+// PollForVariant will prompt the user to select a variant
+func PollForVariant(termSess *term.Session, content string, size int) int {
+	// Show the variant list to the user
+	PrintBuffer(content)
+
+	// Loop until we have a valid option for a variant to tail.
+	for {
+		// Get which variant they want to tail.
+		index, err := GetOption(termSess)
+
+		if err != nil || index > size || index == 0 {
+			errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
+			PrintBuffer(errMsg)
+			continue
+		}
+
+		// Handle the quit case.
+		if index == -1 {
+			termSess.End()
+			os.Exit(0)
+		}
+
+		return index
+	}
+}
+
+// PollForInput will query the stdin to determine if someone has entered a command
+func PollForInput(termSess *term.Session) {
 	// Read the std input
 	reader := bufio.NewReader(os.Stdin)
 
@@ -104,14 +131,57 @@ func CheckForPause(sess *session.Session) {
 		switch r {
 		case rune(112):
 			// (p)ause
-			sess.Paused = true
+			termSess.Paused = true
 		case rune(114):
 			// (r)esume
-			sess.Paused = false
+			termSess.Paused = false
+		case rune(99):
+			// (c)hange variant
+			termSess.Reset = true
+			return
 		case rune(113):
 			// (q)uit
-			sess.End()
+			termSess.End()
 			os.Exit(0)
 		}
 	}
+}
+
+// GetHeader returns the header string with padding.
+func GetHeader(width int, txt string) string {
+	output := new(bytes.Buffer)
+	title := fmt.Sprintf("[hlstail] %s", txt)
+
+	fmt.Fprint(output, PadString(title, width, "="), "\r\n")
+
+	return output.String()
+}
+
+// GetFooter returns the footer with padding.
+func GetFooter(width int, txt string) string {
+	output := new(bytes.Buffer)
+
+	if txt == "" {
+		width = width + 2
+	}
+
+	fmt.Fprint(output, PadString(txt, width, "="), "\r\n")
+
+	return output.String()
+}
+
+// LogToFile is a debug method used to do linear logging, output to stdout in raw
+// mode makes this extremely difficult otherwise.
+func LogToFile(val interface{}) {
+	s := fmt.Sprintf("%s\n", val)
+
+	f, err := os.OpenFile("output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err != nil {
+		return
+	}
+
+	defer f.Close()
+
+	f.WriteString(s)
 }
