@@ -12,6 +12,7 @@ type Session struct {
 	PreviousState *terminal.State
 	StdinFd       int
 	Paused        bool
+	Reset         bool
 }
 
 // NewSession creates a new session

@@ -5,25 +5,29 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/moore0n/hlstail/pkg/term"
 	"github.com/moore0n/hlstail/pkg/tools"
 )
 
 // Session Stores state information
 type Session struct {
-	TermSession      *term.Session
-	URL              string
-	Master           *Master
-	Variant          *Variant
-	PreviousSegments [][]string
+	URL     string
+	Master  *Master
+	Variant *Variant
 }
 
 // NewSession return a new session
-func NewSession(termSession *term.Session, URL string) *Session {
-	return &Session{
-		TermSession: termSession,
-		URL:         URL,
+func NewSession(URL string) (*Session, error) {
+	sess := &Session{
+		URL: URL,
 	}
+
+	sess.Master = NewMaster(sess.URL)
+
+	if err := sess.Master.Get(); err != nil {
+		return nil, err
+	}
+
+	return sess, nil
 }
 
 // GetMasterPlaylistOptions return the possible playlist options.
@@ -32,19 +36,14 @@ func (sess *Session) GetMasterPlaylistOptions(width int) (string, int) {
 
 	if err := sess.Master.Get(); err != nil {
 		fmt.Println("error getting master playlist.")
-		sess.TermSession.End()
 		return "", 0
 	}
 
 	output := new(bytes.Buffer)
 
-	fmt.Fprint(output, tools.PadString("[hlstail] Select a variant", width, "="), "\r\n")
-	fmt.Fprint(output, tools.PadString("", width+2, " "), "\r\n")
-
+	fmt.Fprint(output, tools.GetHeader(width, "Select a variant"), "\r\n")
 	fmt.Fprint(output, sess.Master.GetVariantList())
-
-	fmt.Fprint(output, tools.PadString("", width+2, " "), "\r\n")
-	fmt.Fprint(output, tools.PadString("", width+2, "="), "\r\n")
+	fmt.Fprint(output, "\r\n", tools.GetFooter(width, ""))
 
 	fmt.Fprint(output, "\r\nactions: (q)uit \r\n")
 
@@ -60,16 +59,13 @@ func (sess *Session) SetVariant(index int) {
 func (sess *Session) GetVariantPrintData(width int, count int) string {
 	output := new(bytes.Buffer)
 
-	fmt.Fprint(output, tools.PadString("[hlstail] Segment Data", width, "="))
-	fmt.Fprint(output, tools.PadString("", width+2, " "))
-
+	fmt.Fprint(output, tools.GetHeader(width, "Segment Data"))
 	fmt.Fprint(output, sess.Variant.GetSegmentsToPrint(count))
 
 	now := time.Now()
 	now = now.UTC()
 
-	fmt.Fprint(output, tools.PadString("", width+2, " "), "\r\n")
-	fmt.Fprint(output, tools.PadString(now.Format(time.RFC3339), width, "="), "\r\n")
+	fmt.Fprint(output, "\r\n", tools.GetFooter(width, now.Format(time.RFC3339)))
 
 	fmt.Fprint(output, "\r\nactions: (q)uit (p)ause (r)esume (c)hange variant\r\n")
 

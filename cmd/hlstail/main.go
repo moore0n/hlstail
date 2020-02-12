@@ -60,7 +60,6 @@ func main() {
 }
 
 func tail(playlist string, count int, interval int, variant int) error {
-
 	termSess := term.NewSession()
 
 	if err := termSess.MakeRaw(); err != nil {
@@ -73,50 +72,33 @@ func tail(playlist string, count int, interval int, variant int) error {
 	width := termSess.GetCliWidth()
 
 	// Create a new HLS Session to manage the requests.
-	hls := hls.NewSession(termSess, playlist)
+	hls, err := hls.NewSession(playlist)
+
+	if err != nil {
+		termSess.End()
+		return err
+	}
 
 	// Get the Master and return the variant list.
 	content, size := hls.GetMasterPlaylistOptions(width)
 
-	if variant == 0 {
-
-		// Show the variant list to the user
-		tools.PrintBuffer(content)
-
-		// Loop until we have a valid option for a variant to tail.
-		for {
-			// Get which variant they want to tail.
-			index, err := tools.GetOption(termSess)
-
-			if err != nil || index > size || index == 0 {
-				errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
-				tools.PrintBuffer(errMsg)
-				continue
-			}
-
-			// Handle the quit case.
-			if index == -1 {
-				termSess.End()
-				return nil
-			}
-
-			variant = index - 1
-
-			break
+	for {
+		if variant == 0 {
+			variant = tools.PollForVariant(termSess, content, size)
 		}
 
+		// Set the variant that was selected in the previous loop.
+		hls.SetVariant(variant - 1)
+
+		// Run the updates in a go routine but respect the pause state.
+		go updateLoop(termSess, interval, count, hls)
+
+		// Run the loop to poll input for commands.
+		tools.PollForInput(termSess)
+
+		// Reset the variant so that we can prompt for variant selection if the user selects that option
+		variant = 0
 	}
-
-	// Set the variant that was selected in the previous loop.
-	hls.SetVariant(variant)
-
-	// Run the updates in a go routine but respect the pause state.
-	go updateLoop(termSess, interval, count, hls)
-
-	// Run the loop to poll input for pause.
-	tools.CheckForPause(termSess)
-
-	return nil
 }
 
 // updateLoop will query for updates at the supplied interval
@@ -127,13 +109,21 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 
 	// Loop forever and request updates every n number of seconds.
 	for {
-
-		// Prevent maxing out the CPU.
-		time.Sleep(time.Millisecond * 250)
-
+		// Check timer and statechange. If we are still paused then don't update the screen.
 		if nextRun > time.Now().Unix() && lastPauseState == termSess.Paused {
-			lastPauseState = termSess.Paused
 			continue
+		}
+
+		/**
+		 *	Handle the reset here, we need to return so this go routine will die
+		 * 	and we can start another one when the user selects a variant.
+		 *  */
+		if termSess.Reset {
+			termSess.Reset = false
+			termSess.Paused = false
+			// clear the previous segments
+			hls.Variant.Segments = make([][]string, 0)
+			return
 		}
 
 		if !termSess.Paused {
@@ -162,5 +152,8 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 
 		lastPauseState = termSess.Paused
 		nextRun = time.Now().Unix() + int64(interval)
+
+		// Prevent maxing out the CPU.
+		time.Sleep(time.Millisecond)
 	}
 }
