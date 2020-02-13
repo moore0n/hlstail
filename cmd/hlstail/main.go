@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,8 +71,6 @@ func tail(playlist string, count int, interval int, variant int) error {
 	// Start the new terminal session
 	termSess.Start()
 
-	width := termSess.GetCliWidth()
-
 	// Create a new HLS Session to manage the requests.
 	hls, err := hls.NewSession(playlist)
 
@@ -79,12 +79,16 @@ func tail(playlist string, count int, interval int, variant int) error {
 		return err
 	}
 
-	// Get the Master and return the variant list.
-	content, size := hls.GetMasterPlaylistOptions(width)
-
 	for {
 		if variant == 0 {
-			variant = tools.PollForVariant(termSess, content, size)
+			variant, err = PollForVariant(termSess, hls)
+
+			if err != nil {
+				// (q)uit
+				termSess.End()
+				fmt.Println("error getting master playlist.")
+				os.Exit(0)
+			}
 		}
 
 		// Set the variant that was selected in the previous loop.
@@ -94,10 +98,95 @@ func tail(playlist string, count int, interval int, variant int) error {
 		go updateLoop(termSess, interval, count, hls)
 
 		// Run the loop to poll input for commands.
-		tools.PollForInput(termSess)
+		PollForInput(termSess)
 
 		// Reset the variant so that we can prompt for variant selection if the user selects that option
 		variant = 0
+	}
+}
+
+// PollForInput will query the stdin to determine if someone has entered a command
+func PollForInput(termSess *term.Session) {
+	// Read the std input
+	reader := bufio.NewReader(os.Stdin)
+
+	// Loop and read the input waiting for keyboard input
+	for {
+		r, _, err := reader.ReadRune()
+
+		if err != nil {
+			break
+		}
+
+		switch r {
+		case rune(112):
+			// (p)ause
+			termSess.Paused = true
+		case rune(114):
+			// (r)esume
+			termSess.Paused = false
+		case rune(99):
+			// (c)hange variant
+			termSess.Reset = true
+			return
+		case rune(113):
+			// (q)uit
+			termSess.End()
+			os.Exit(0)
+		}
+	}
+}
+
+// PollForVariant will prompt the user to select a variant
+func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
+	width := termSess.GetCliWidth()
+
+	// Get the Master and return the variant list.
+	content := hls.GetMasterPlaylistOptions(width)
+
+	// Show the variant list to the user
+	tools.PrintBuffer(content)
+
+	// Read the std input
+	reader := bufio.NewReader(os.Stdin)
+
+	// Loop until we have a valid option for a variant to tail.
+	for {
+		r, _, err := reader.ReadRune()
+
+		if err != nil {
+			return 0, err
+		}
+
+		switch r {
+		case rune(113):
+			// (q)uit
+			termSess.End()
+			os.Exit(0)
+		case rune(114):
+			// (r)efresh
+			width = termSess.GetCliWidth()
+			// Get the Master and return the variant list.
+			content = hls.GetMasterPlaylistOptions(width)
+			// Reprint the variant list.
+			tools.PrintBuffer(content)
+			// Continue to monitor user input
+			continue
+		default:
+			index, err := strconv.Atoi(string(r))
+
+			if err != nil {
+				continue
+			}
+
+			if err != nil || index > len(hls.Master.Variants) || index == 0 {
+				errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
+				tools.PrintBuffer(errMsg)
+				continue
+			}
+
+			return index, nil
+		}
 	}
 }
 
@@ -154,6 +243,6 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 		nextRun = time.Now().Unix() + int64(interval)
 
 		// Prevent maxing out the CPU.
-		time.Sleep(time.Millisecond)
+		time.Sleep(time.Millisecond * 100)
 	}
 }

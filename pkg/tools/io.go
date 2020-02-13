@@ -1,61 +1,15 @@
 package tools
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
-
-	"github.com/moore0n/hlstail/pkg/term"
 )
 
 // PrintBuffer prints the value of val to stdout
 func PrintBuffer(val interface{}) {
 	fmt.Printf("\033[1;1H\033[0J%v", val)
-}
-
-// GetOption returns a selected option from stdin
-func GetOption(termSess *term.Session) (int, error) {
-	option := 0
-
-	// Read the std input
-	reader := bufio.NewReader(os.Stdin)
-
-	// Loop and read the input waiting for keyboard input
-	for {
-		r, _, err := reader.ReadRune()
-
-		if err != nil {
-			return option, err
-		}
-
-		/**
-		* Ignore the escape sequence that could come back in the read rune.
-		* 27 == ESC
-		* 91 == [
-		 */
-		if r == rune(27) || r == rune(91) {
-			continue
-		}
-
-		switch r {
-		case rune(113):
-			// (q)uit
-			termSess.End()
-			os.Exit(0)
-		}
-
-		// If the value provided is not an int continue until a valid value is provided.
-		if option, err = strconv.Atoi(string(r)); err != nil {
-			continue
-		}
-
-		break
-	}
-
-	return option, nil
 }
 
 // PadString returns a new padded string
@@ -78,73 +32,6 @@ func PadString(content string, width int, char string) string {
 	padding := strings.Join(rawPadding, "")
 
 	return fmt.Sprintf("%s%s%s", padding, content, padding)
-}
-
-// PollForVariant will prompt the user to select a variant
-func PollForVariant(termSess *term.Session, content string, size int) int {
-	// Show the variant list to the user
-	PrintBuffer(content)
-
-	// Loop until we have a valid option for a variant to tail.
-	for {
-		// Get which variant they want to tail.
-		index, err := GetOption(termSess)
-
-		if err != nil || index > size || index == 0 {
-			errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
-			PrintBuffer(errMsg)
-			continue
-		}
-
-		// Handle the quit case.
-		if index == -1 {
-			termSess.End()
-			os.Exit(0)
-		}
-
-		return index
-	}
-}
-
-// PollForInput will query the stdin to determine if someone has entered a command
-func PollForInput(termSess *term.Session) {
-	// Read the std input
-	reader := bufio.NewReader(os.Stdin)
-
-	// Loop and read the input waiting for keyboard input
-	for {
-		r, _, err := reader.ReadRune()
-
-		if err != nil {
-			break
-		}
-
-		/**
-		* Ignore the escape sequence that could come back in the read rune.
-		* 27 == ESC
-		* 91 == [
-		 */
-		if r == rune(27) || r == rune(91) {
-			continue
-		}
-
-		switch r {
-		case rune(112):
-			// (p)ause
-			termSess.Paused = true
-		case rune(114):
-			// (r)esume
-			termSess.Paused = false
-		case rune(99):
-			// (c)hange variant
-			termSess.Reset = true
-			return
-		case rune(113):
-			// (q)uit
-			termSess.End()
-			os.Exit(0)
-		}
-	}
 }
 
 // GetHeader returns the header string with padding.
