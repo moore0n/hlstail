@@ -2,7 +2,7 @@ name: Tag
 on:
   push:
     branches:
-      - release
+      - master
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,4 +16,4 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         WITH_V: true
         DEFAULT_BUMP: patch
-        RELEASE_BRANCHES: master,release
+        RELEASE_BRANCHES: master
