@@ -18,7 +18,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.6"
+	app.Version = "1.0.7"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
@@ -198,6 +198,9 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 
 	// Loop forever and request updates every n number of seconds.
 	for {
+		// Prevent maxing out the CPU.
+		time.Sleep(time.Millisecond * 50)
+
 		// Check timer and statechange. If we are still paused then don't update the screen.
 		if nextRun > time.Now().Unix() && lastPauseState == termSess.Paused {
 			continue
@@ -241,8 +244,5 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 
 		lastPauseState = termSess.Paused
 		nextRun = time.Now().Unix() + int64(interval)
-
-		// Prevent maxing out the CPU.
-		time.Sleep(time.Millisecond * 100)
 	}
 }
