@@ -11,7 +11,7 @@ NAME:
    hlstail - Query an HLS playlist and then tail the new segments of a selected variant
 
 USAGE:
-   [playlist]
+   hlstail [options...] <playlist>
 
 VERSION:
    1.0.8
