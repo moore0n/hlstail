@@ -22,14 +22,14 @@ func main() {
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
-	app.UsageText = "[playlist]"
+	app.UsageText = "hlstail [options...] <playlist>"
 
 	app.Action = func(c *cli.Context) error {
 
 		playlist := c.Args().Get(0)
 
 		// Validate that we have a playlist value.
-		if len(playlist) == 0 {
+		if playlist == "" {
 			cli.ShowAppHelpAndExit(c, 0)
 		}
 
