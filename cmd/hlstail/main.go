@@ -12,7 +12,7 @@ import (
 	"github.com/moore0n/hlstail/pkg/hls"
 	"github.com/moore0n/hlstail/pkg/term"
 	"github.com/moore0n/hlstail/pkg/tools"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
@@ -37,17 +37,17 @@ func main() {
 	}
 
 	app.Flags = []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "count",
 			Usage: "The number of segments to display",
 			Value: 5,
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "interval",
 			Usage: "The number of seconds to wait between updates",
 			Value: 3,
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "variant",
 			Usage: "The number of the variant you'd like to use",
 			Value: 0,
@@ -70,6 +70,9 @@ func tail(playlist string, count int, interval int, variant int) error {
 
 	// Start the new terminal session
 	termSess.Start()
+
+	// Print the loading screen here before we make the request.
+	tools.PrintLoading(termSess.GetCliWidth())
 
 	// Create a new HLS Session to manage the requests.
 	hls, err := hls.NewSession(playlist)
