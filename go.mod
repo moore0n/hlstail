@@ -1,6 +1,6 @@
 module github.com/moore0n/hlstail
 
-go 1.13.7
+go 1.13
 
 require (
 	github.com/urfave/cli/v2 v2.1.1

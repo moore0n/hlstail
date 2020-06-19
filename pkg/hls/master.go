@@ -80,7 +80,7 @@ func (m *Master) GetVariantList() string {
 }
 
 func parseVariants(rootURL string, rawData string) []*Variant {
-	// Make a slice to store the segments to be printed.
+	// Make a slice to store the variants to be printed.
 	variants := make([]*Variant, 0)
 
 	lines := strings.Split(rawData, "\n")
@@ -95,10 +95,49 @@ func parseVariants(rootURL string, rawData string) []*Variant {
 			continue
 		}
 
-		// We've hit the ts line so we need to push this segment into the list.
 		if strings.Index(line, "#") == 0 {
-			// segments = append(segments, segment)
 			variant.Tags = append(variant.Tags, line)
+
+			// If this is a media tag then we need to parse it now rather than waiting for the source line.
+			if strings.Index(line, "#EXT-X-MEDIA") == 0 {
+
+				// Get the portion after the media tag
+				data := strings.Split(line, ":")
+
+				// If we don't have something we can parse, just continue
+				if len(data) != 2 {
+					continue
+				}
+
+				// Break out the key / value pairs
+				parts := strings.Split(data[1], ",")
+
+				for _, part := range parts {
+
+					kv := strings.Split(part, "=")
+
+					switch kv[0] {
+					case "URI":
+
+						variant.URL = strings.ReplaceAll(kv[1], "\"", "")
+
+						if strings.Index(variant.URL, "http") == -1 {
+							variant.URL = fmt.Sprintf("%s/%s", rootURL, variant.URL)
+						}
+					case "NAME":
+						variant.Resolution = kv[1]
+					default:
+						// Ignore any fields we don't about for now.
+						break
+					}
+				}
+
+				variants = append(variants, variant)
+
+				// Create a new variant.
+				variant = &Variant{}
+
+			}
 		} else {
 			// We've hit the source and need to push the variant into the list.
 			variant.URL = line
@@ -111,7 +150,7 @@ func parseVariants(rootURL string, rawData string) []*Variant {
 
 			variants = append(variants, variant)
 
-			// Create a new array.
+			// Create a new variant.
 			variant = &Variant{}
 		}
 	}
