@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -42,8 +43,10 @@ func (m *Master) Get() error {
 
 	m.rawData = string(body)
 
-	rootURLParts := strings.Split(m.url, "/")
-	rootURL := strings.Join(rootURLParts[:len(rootURLParts)-1], "/")
+	rootURL, err := url.Parse(m.url)
+	if err != nil {
+		return err
+	}
 
 	m.Variants = parseVariants(rootURL, m.rawData)
 
@@ -79,7 +82,7 @@ func (m *Master) GetVariantList() string {
 	return output.String()
 }
 
-func parseVariants(rootURL string, rawData string) []*Variant {
+func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 	// Make a slice to store the variants to be printed.
 	variants := make([]*Variant, 0)
 
@@ -139,12 +142,23 @@ func parseVariants(rootURL string, rawData string) []*Variant {
 
 			}
 		} else {
-			// We've hit the source and need to push the variant into the list.
-			variant.URL = line
 
-			if strings.Index(variant.URL, "http") == -1 {
-				variant.URL = fmt.Sprintf("%s/%s", rootURL, variant.URL)
+			// Parse the url, and then apply the protocol and host from the parent.
+			u, err := url.Parse(line)
+			if err != nil {
+				variant.URL = "invalid-url"
 			}
+
+			// Here we want to fill in the blanks if the provided url is relative.
+			if u.Host == "" {
+				u.Host = rootURL.Host
+			}
+
+			if u.Scheme == "" {
+				u.Scheme = rootURL.Scheme
+			}
+
+			variant.URL = u.String()
 
 			variant.Process()
 
