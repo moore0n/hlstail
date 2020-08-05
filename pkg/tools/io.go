@@ -64,6 +64,15 @@ func GetFooter(width int, txt string) string {
 	return output.String()
 }
 
+// GetSeparator returns a content separator
+func GetSeparator(width int, char string) string {
+	output := new(bytes.Buffer)
+
+	fmt.Fprint(output, PadString("", width, char), "\r\n")
+
+	return output.String()
+}
+
 // LogToFile is a debug method used to do linear logging, output to stdout in raw
 // mode makes this extremely difficult otherwise.
 func LogToFile(val interface{}) {
