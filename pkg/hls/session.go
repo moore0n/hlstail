@@ -63,12 +63,16 @@ func (sess *Session) GetVariantPrintData(width int, count int) string {
 	output := new(bytes.Buffer)
 
 	fmt.Fprint(output, tools.GetHeader(width, " Segment Data"))
-	fmt.Fprint(output, sess.Variant.GetSegmentsToPrint(count))
 
-	now := time.Now()
-	now = now.UTC()
+	if err := sess.Variant.Refresh(); err != nil {
+		fmt.Fprint(output, err.Error())
+	} else {
+		fmt.Fprint(output, sess.Variant.GetHeaderTagsToPrint())
+		fmt.Fprint(output, tools.GetSeparator(width, "-"))
+		fmt.Fprint(output, sess.Variant.GetSegmentsToPrint(count))
+	}
 
-	fmt.Fprint(output, "\r\n", tools.GetFooter(width, now.Format(time.RFC3339)))
+	fmt.Fprint(output, "\r\n", tools.GetFooter(width, time.Now().UTC().Format(time.RFC3339)))
 
 	fmt.Fprint(output, "\r\nactions: (q)uit (p)ause (r)esume (c)hange variant\r\n")
 
