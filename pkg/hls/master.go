@@ -152,6 +152,8 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 			// Here we want to fill in the blanks if the provided url is relative.
 			if u.Host == "" {
 				u.Host = rootURL.Host
+				rootPath := strings.Split(rootURL.Path, "/")
+				u.Path = fmt.Sprintf("%s/%s", strings.Join(rootPath[:len(rootPath)-1], "/"), u.Path)
 			}
 
 			if u.Scheme == "" {
