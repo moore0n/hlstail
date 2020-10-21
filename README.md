@@ -14,7 +14,7 @@ USAGE:
    hlstail [options...] <playlist>
 
 VERSION:
-   1.0.11
+   1.0.12
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
