@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.12"
+	app.Version = "1.0.13"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
@@ -95,7 +94,7 @@ func tail(playlist string, count int, interval int, variant int) error {
 		}
 
 		// Set the variant that was selected in the previous loop.
-		hls.SetVariant(variant - 1)
+		hls.SetVariant(variant)
 
 		// Run the updates in a go routine but respect the pause state.
 		go updateLoop(termSess, interval, count, hls)
@@ -142,10 +141,12 @@ func PollForInput(termSess *term.Session) {
 
 // PollForVariant will prompt the user to select a variant
 func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
+	selectedIndex := 0
+
 	width := termSess.GetCliWidth()
 
 	// Get the Master and return the variant list.
-	content := hls.GetMasterPlaylistOptions(width)
+	content := hls.GetMasterPlaylistOptions(width, selectedIndex, true)
 
 	// Show the variant list to the user
 	tools.PrintBuffer(content)
@@ -169,26 +170,50 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 		case rune(114):
 			// (r)efresh
 			width = termSess.GetCliWidth()
+			selectedIndex = 0
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width)
+			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
 			continue
-		default:
-			index, err := strconv.Atoi(string(r))
+		case rune(13):
+			// enter key
+			return selectedIndex, nil
+		case rune(27):
+			// Ignore control characters
+			continue
+		case rune(91):
+			// Ignore control characters
+			continue
+		case rune(65):
+			// Up arrow
+			width = termSess.GetCliWidth()
 
-			if err != nil {
-				continue
+			if selectedIndex > 0 {
+				selectedIndex--
 			}
 
-			if err != nil || index > len(hls.Master.Variants) || index == 0 {
-				errMsg := fmt.Sprintf("%s\n%s%s\n", content, "Incorrect option provided, try again : ", err)
-				tools.PrintBuffer(errMsg)
-				continue
+			// Get the Master and return the variant list.
+			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			// Reprint the variant list.
+			tools.PrintBuffer(content)
+			// Continue to monitor user input
+			continue
+		case rune(66):
+			// Down arrow
+			width = termSess.GetCliWidth()
+
+			if selectedIndex < len(hls.Master.Variants)-1 {
+				selectedIndex++
 			}
 
-			return index, nil
+			// Get the Master and return the variant list.
+			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			// Reprint the variant list.
+			tools.PrintBuffer(content)
+			// Continue to monitor user input
+			continue
 		}
 	}
 }
