@@ -65,7 +65,7 @@ func (m *Master) GetVariant(index int) (*Variant, error) {
 }
 
 // GetVariantList gets a printable list of variants
-func (m *Master) GetVariantList() string {
+func (m *Master) GetVariantList(selectedIndex int) string {
 	output := new(bytes.Buffer)
 
 	for i, variant := range m.Variants {
@@ -76,7 +76,11 @@ func (m *Master) GetVariantList() string {
 			res = "audio-only"
 		}
 
-		fmt.Fprintf(output, "%d) %s - %s -> %s\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+		if i == selectedIndex {
+			fmt.Fprintf(output, "\033[0;30;47m%d) %s - %s -> %s\033[0m\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+		} else {
+			fmt.Fprintf(output, "%d) %s - %s -> %s\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+		}
 	}
 
 	return output.String()
