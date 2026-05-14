@@ -19,6 +19,15 @@ import (
 
 var errQuit = errors.New("quit")
 
+type inputCommand int
+
+const (
+	commandPause inputCommand = iota
+	commandResume
+	commandChangeVariant
+	commandQuit
+)
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
@@ -122,11 +131,13 @@ func tail(playlist string, count int, interval int, variant *int) error {
 			return err
 		}
 
-		// Run the updates in a go routine but respect the pause state.
-		go updateLoop(termSess, interval, count, hls)
+		commands := make(chan inputCommand, 1)
+
+		// Run the updates in a go routine but respect input commands.
+		go updateLoop(termSess, interval, count, hls, commands)
 
 		// Run the loop to poll input for commands.
-		if err := PollForInput(termSess); err != nil {
+		if err := PollForInput(commands); err != nil {
 			if errors.Is(err, errQuit) {
 				return nil
 			}
@@ -159,7 +170,7 @@ func restoreTerminalOnSignal(termSess *term.Session) func() {
 }
 
 // PollForInput will query the stdin to determine if someone has entered a command
-func PollForInput(termSess *term.Session) error {
+func PollForInput(commands chan<- inputCommand) error {
 	// Read the std input
 	reader := bufio.NewReader(os.Stdin)
 
@@ -168,22 +179,24 @@ func PollForInput(termSess *term.Session) error {
 		r, _, err := reader.ReadRune()
 
 		if err != nil {
-			return nil
+			commands <- commandQuit
+			return err
 		}
 
 		switch r {
 		case rune(112):
 			// (p)ause
-			termSess.Paused = true
+			commands <- commandPause
 		case rune(114):
 			// (r)esume
-			termSess.Paused = false
+			commands <- commandResume
 		case rune(99):
 			// (c)hange variant
-			termSess.Reset = true
+			commands <- commandChangeVariant
 			return nil
 		case rune(113):
 			// (q)uit
+			commands <- commandQuit
 			return errQuit
 		}
 	}
@@ -280,34 +293,40 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 }
 
 // updateLoop will query for updates at the supplied interval
-func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Session) {
+func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Session, commands <-chan inputCommand) {
 	var variantInfo string
 	var nextRun int64 = time.Now().Unix()
-	var lastPauseState bool = termSess.Paused
+	var paused bool
+	var lastPauseState bool
 
 	// Loop forever and request updates every n number of seconds.
 	for {
 		// Prevent maxing out the CPU.
 		time.Sleep(time.Millisecond * 50)
 
+		select {
+		case command := <-commands:
+			switch command {
+			case commandPause:
+				paused = true
+			case commandResume:
+				paused = false
+			case commandChangeVariant:
+				// clear the previous segments
+				hls.Variant.Segments = make([][]string, 0)
+				return
+			case commandQuit:
+				return
+			}
+		default:
+		}
+
 		// Check timer and statechange. If we are still paused then don't update the screen.
-		if nextRun > time.Now().Unix() && lastPauseState == termSess.Paused {
+		if nextRun > time.Now().Unix() && lastPauseState == paused {
 			continue
 		}
 
-		/**
-		 *	Handle the reset here, we need to return so this go routine will die
-		 * 	and we can start another one when the user selects a variant.
-		 *  */
-		if termSess.Reset {
-			termSess.Reset = false
-			termSess.Paused = false
-			// clear the previous segments
-			hls.Variant.Segments = make([][]string, 0)
-			return
-		}
-
-		if !termSess.Paused {
+		if !paused {
 			width, err := termSess.GetCliWidth()
 			if err != nil {
 				return
@@ -317,27 +336,32 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 		} else {
 
 			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
-			if lastPauseState != termSess.Paused {
+			if lastPauseState != paused {
 				width, err := termSess.GetCliWidth()
 				if err != nil {
 					return
 				}
 				parts := strings.Split(variantInfo, "\r\n")
-				end := parts[len(parts)-4]
+				if len(parts) < 4 {
+					continue
+				}
+
+				footerIndex := len(parts) - 4
+				end := parts[footerIndex]
 				end = strings.ReplaceAll(end, "=", "")
 
 				end = strings.Trim(end, " ")
 
 				end = fmt.Sprintf("PAUSED @%s", end)
 
-				parts[len(parts)-4] = tools.PadString(end, width, "=")
+				parts[footerIndex] = tools.PadString(end, width, "=")
 
 				// Trim the pause instructions.
 				tools.PrintBuffer(strings.Join(parts, "\r\n"))
 			}
 		}
 
-		lastPauseState = termSess.Paused
+		lastPauseState = paused
 		nextRun = time.Now().Unix() + int64(interval)
 	}
 }
