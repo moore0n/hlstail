@@ -119,7 +119,6 @@ func tail(playlist string, count int, interval int, variant *int) error {
 					return nil
 				}
 
-				fmt.Println("error getting master playlist.")
 				return err
 			}
 		} else {
@@ -212,7 +211,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 	}
 
 	// Get the Master and return the variant list.
-	content := hls.GetMasterPlaylistOptions(width, selectedIndex, true)
+	content, err := hls.GetMasterPlaylistOptions(width, selectedIndex, true)
+	if err != nil {
+		return 0, err
+	}
 
 	// Show the variant list to the user
 	tools.PrintBuffer(content)
@@ -240,7 +242,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			}
 			selectedIndex = 0
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			if err != nil {
+				return 0, err
+			}
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
@@ -266,7 +271,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			}
 
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			if err != nil {
+				return 0, err
+			}
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
@@ -283,7 +291,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			}
 
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			if err != nil {
+				return 0, err
+			}
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input

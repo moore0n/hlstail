@@ -2,7 +2,6 @@ package hls
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -90,7 +89,7 @@ func (v *Variant) Refresh() error {
 
 	// Get new information
 	if err := v.Get(); err != nil {
-		return errors.New("Unable to get segments")
+		return fmt.Errorf("unable to get segments: %w", err)
 	}
 
 	return nil

@@ -31,7 +31,7 @@ func NewSession(URL string) (*Session, error) {
 }
 
 // GetMasterPlaylistOptions return the possible playlist options.
-func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, showLoading bool) string {
+func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, showLoading bool) (string, error) {
 	sess.Master = NewMaster(sess.URL)
 
 	// Print the loading screen here before we make the request.
@@ -40,8 +40,7 @@ func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, show
 	}
 
 	if err := sess.Master.Get(); err != nil {
-		fmt.Println("error getting master playlist.")
-		return ""
+		return "", fmt.Errorf("error getting master playlist: %w", err)
 	}
 
 	output := new(bytes.Buffer)
@@ -52,7 +51,7 @@ func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, show
 
 	fmt.Fprint(output, "\r\nactions: (enter)select variant (q)uit (r)efresh\r\n")
 
-	return output.String()
+	return output.String(), nil
 }
 
 // SetVariant sets the variant used for requesting data
