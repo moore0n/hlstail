@@ -31,7 +31,7 @@ const (
 func main() {
 	app := cli.NewApp()
 	app.Name = "hlstail"
-	app.Version = "1.0.13"
+	app.Version = "1.0.16"
 
 	app.Usage = "Query an HLS playlist and then tail the new segments of a selected variant"
 
