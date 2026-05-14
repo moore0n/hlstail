@@ -39,15 +39,14 @@ func (s *Session) MakeRaw() error {
 }
 
 // GetCliWidth returns the available screen space
-func (s *Session) GetCliWidth() int {
+func (s *Session) GetCliWidth() (int, error) {
 	width, _, err := terminal.GetSize(s.StdinFd)
 
 	if err != nil {
-		s.End()
-		os.Exit(1)
+		return 0, err
 	}
 
-	return width
+	return width, nil
 }
 
 // End returns the terminal to its state from before hlstail started.

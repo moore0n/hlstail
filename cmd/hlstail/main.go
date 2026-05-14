@@ -82,7 +82,11 @@ func tail(playlist string, count int, interval int, variant *int) error {
 	defer termSess.End()
 
 	// Print the loading screen here before we make the request.
-	tools.PrintLoading(termSess.GetCliWidth())
+	width, err := termSess.GetCliWidth()
+	if err != nil {
+		return err
+	}
+	tools.PrintLoading(width)
 
 	// Create a new HLS Session to manage the requests.
 	hls, err := hls.NewSession(playlist)
@@ -166,7 +170,10 @@ func PollForInput(termSess *term.Session) error {
 func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 	selectedIndex := 0
 
-	width := termSess.GetCliWidth()
+	width, err := termSess.GetCliWidth()
+	if err != nil {
+		return 0, err
+	}
 
 	// Get the Master and return the variant list.
 	content := hls.GetMasterPlaylistOptions(width, selectedIndex, true)
@@ -191,7 +198,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			return 0, errQuit
 		case rune(114):
 			// (r)efresh
-			width = termSess.GetCliWidth()
+			width, err = termSess.GetCliWidth()
+			if err != nil {
+				return 0, err
+			}
 			selectedIndex = 0
 			// Get the Master and return the variant list.
 			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
@@ -210,7 +220,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			continue
 		case rune(65):
 			// Up arrow
-			width = termSess.GetCliWidth()
+			width, err = termSess.GetCliWidth()
+			if err != nil {
+				return 0, err
+			}
 
 			if selectedIndex > 0 {
 				selectedIndex--
@@ -224,7 +237,10 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			continue
 		case rune(66):
 			// Down arrow
-			width = termSess.GetCliWidth()
+			width, err = termSess.GetCliWidth()
+			if err != nil {
+				return 0, err
+			}
 
 			if selectedIndex < len(hls.Master.Variants)-1 {
 				selectedIndex++
@@ -269,14 +285,20 @@ func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Sessio
 		}
 
 		if !termSess.Paused {
-			width := termSess.GetCliWidth()
+			width, err := termSess.GetCliWidth()
+			if err != nil {
+				return
+			}
 			variantInfo = hls.GetVariantPrintData(width, count)
 			tools.PrintBuffer(variantInfo)
 		} else {
 
 			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
 			if lastPauseState != termSess.Paused {
-				width := termSess.GetCliWidth()
+				width, err := termSess.GetCliWidth()
+				if err != nil {
+					return
+				}
 				parts := strings.Split(variantInfo, "\r\n")
 				end := parts[len(parts)-4]
 				end = strings.ReplaceAll(end, "=", "")
