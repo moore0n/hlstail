@@ -14,7 +14,7 @@ USAGE:
    hlstail [options...] <playlist>
 
 VERSION:
-   1.0.13
+   1.0.15
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -29,13 +29,12 @@ GLOBAL OPTIONS:
 
 ## Install 
 ```
-go get -u github.com/moore0n/hlstail
-go install github.com/moore0n/hlstail/...
+go install github.com/moore0n/hlstail@latest
 ```
 
 ## Try
 ```
-hlstail --count 10 --interval 3 http://qthttp.apple.com.edgesuite.net/1010qwoeiuryfg/sl.m3u8
+hlstail --count 10 --interval 3 [URL]
 ```
 
 ## Build
