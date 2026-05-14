@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/moore0n/hlstail/pkg/tools"
 	"github.com/urfave/cli/v2"
 )
+
+var errQuit = errors.New("quit")
 
 func main() {
 	app := cli.NewApp()
@@ -76,6 +79,7 @@ func tail(playlist string, count int, interval int, variant *int) error {
 
 	// Start the new terminal session
 	termSess.Start()
+	defer termSess.End()
 
 	// Print the loading screen here before we make the request.
 	tools.PrintLoading(termSess.GetCliWidth())
@@ -84,7 +88,6 @@ func tail(playlist string, count int, interval int, variant *int) error {
 	hls, err := hls.NewSession(playlist)
 
 	if err != nil {
-		termSess.End()
 		return err
 	}
 
@@ -95,10 +98,12 @@ func tail(playlist string, count int, interval int, variant *int) error {
 			selectedVariant, err = PollForVariant(termSess, hls)
 
 			if err != nil {
-				// (q)uit
-				termSess.End()
+				if errors.Is(err, errQuit) {
+					return nil
+				}
+
 				fmt.Println("error getting master playlist.")
-				os.Exit(0)
+				return err
 			}
 		} else {
 			selectedVariant = *variant
@@ -113,7 +118,13 @@ func tail(playlist string, count int, interval int, variant *int) error {
 		go updateLoop(termSess, interval, count, hls)
 
 		// Run the loop to poll input for commands.
-		PollForInput(termSess)
+		if err := PollForInput(termSess); err != nil {
+			if errors.Is(err, errQuit) {
+				return nil
+			}
+
+			return err
+		}
 
 		// Reset the variant so that we can prompt for variant selection if the user selects that option
 		variant = nil
@@ -121,7 +132,7 @@ func tail(playlist string, count int, interval int, variant *int) error {
 }
 
 // PollForInput will query the stdin to determine if someone has entered a command
-func PollForInput(termSess *term.Session) {
+func PollForInput(termSess *term.Session) error {
 	// Read the std input
 	reader := bufio.NewReader(os.Stdin)
 
@@ -130,7 +141,7 @@ func PollForInput(termSess *term.Session) {
 		r, _, err := reader.ReadRune()
 
 		if err != nil {
-			break
+			return nil
 		}
 
 		switch r {
@@ -143,11 +154,10 @@ func PollForInput(termSess *term.Session) {
 		case rune(99):
 			// (c)hange variant
 			termSess.Reset = true
-			return
+			return nil
 		case rune(113):
 			// (q)uit
-			termSess.End()
-			os.Exit(0)
+			return errQuit
 		}
 	}
 }
@@ -178,8 +188,7 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 		switch r {
 		case rune(113):
 			// (q)uit
-			termSess.End()
-			os.Exit(0)
+			return 0, errQuit
 		case rune(114):
 			// (r)efresh
 			width = termSess.GetCliWidth()
