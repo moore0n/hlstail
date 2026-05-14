@@ -59,7 +59,7 @@ func main() {
 		&cli.IntFlag{
 			Name:  "count",
 			Usage: "The number of segments to display",
-			Value: 5,
+			Value: 10,
 		},
 		&cli.IntFlag{
 			Name:  "interval",

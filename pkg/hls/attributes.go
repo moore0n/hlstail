@@ -7,11 +7,16 @@ func parseTagAttributes(raw string) map[string]string {
 
 	for _, part := range splitAttributes(raw) {
 		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
-		if len(kv) != 2 || kv[0] == "" {
+		if len(kv) != 2 {
 			continue
 		}
 
-		attrs[kv[0]] = strings.Trim(strings.TrimSpace(kv[1]), "\"")
+		key := strings.TrimSpace(kv[0])
+		if key == "" {
+			continue
+		}
+
+		attrs[key] = strings.Trim(strings.TrimSpace(kv[1]), "\"")
 	}
 
 	return attrs

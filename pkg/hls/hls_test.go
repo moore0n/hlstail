@@ -94,6 +94,30 @@ func TestParseVariantsResolvesMediaURIAndIgnoresMalformedAttributes(t *testing.T
 	}
 }
 
+func TestParseVariantsIgnoresSubtitleMedia(t *testing.T) {
+	rootURL, err := url.Parse("https://example.com/live/master.m3u8")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	variants := parseVariants(rootURL, strings.Join([]string{
+		"#EXTM3U",
+		`#EXT-X-MEDIA:TYPE=SUBTITLES,NAME="English",URI="subs/en.m3u8"`,
+		`#EXT-X-MEDIA:TYPE="SUBTITLES",NAME="Spanish",URI="subs/es.m3u8"`,
+		`#EXT-X-MEDIA:TYPE = SUBTITLES,NAME="French",URI="subs/fr.m3u8"`,
+		`#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS,NAME="CC"`,
+		`#EXT-X-MEDIA:TYPE=AUDIO,NAME="English",URI="audio/en.m3u8"`,
+	}, "\n"))
+
+	if len(variants) != 1 {
+		t.Fatalf("expected only the audio media variant, got %d", len(variants))
+	}
+
+	if got := variants[0].URL; got != "https://example.com/live/audio/en.m3u8" {
+		t.Fatalf("expected audio media URL, got %q", got)
+	}
+}
+
 func TestParseVariantsResolvesStreamURIAndProcessesAttributes(t *testing.T) {
 	rootURL, err := url.Parse("https://example.com/live/master.m3u8")
 	if err != nil {
@@ -128,6 +152,35 @@ func TestParseVariantsResolvesStreamURIAndProcessesAttributes(t *testing.T) {
 	}
 }
 
+func TestParseVariantsSortsByBandwidth(t *testing.T) {
+	rootURL, err := url.Parse("https://example.com/live/master.m3u8")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	variants := parseVariants(rootURL, strings.Join([]string{
+		"#EXTM3U",
+		`#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080`,
+		"high.m3u8",
+		`#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=854x480`,
+		"low.m3u8",
+		`#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720`,
+		"mid.m3u8",
+	}, "\n"))
+
+	if len(variants) != 3 {
+		t.Fatalf("expected 3 variants, got %d", len(variants))
+	}
+
+	got := []int{variants[0].Bandwidth, variants[1].Bandwidth, variants[2].Bandwidth}
+	want := []int{800000, 1500000, 3000000}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected bandwidth order %v, got %v", want, got)
+		}
+	}
+}
+
 func TestGetVariantListMarksSelectedAndAudioOnly(t *testing.T) {
 	master := &Master{Variants: []*Variant{
 		{URL: "audio.m3u8", Bandwidth: 64000},
@@ -135,11 +188,11 @@ func TestGetVariantListMarksSelectedAndAudioOnly(t *testing.T) {
 	}}
 
 	list := master.GetVariantList(1)
-	if !strings.Contains(list, "1) audio-only - 64000 -> audio.m3u8") {
+	if !strings.Contains(list, "1) audio-only - 64 Kbps -> audio.m3u8") {
 		t.Fatalf("expected audio-only variant in list, got %q", list)
 	}
 
-	if !strings.Contains(list, "\033[0;30;47m2) 1280x720 - 1280000 -> video.m3u8\033[0m") {
+	if !strings.Contains(list, "\033[0;30;47m2) 1280x720 - 1280 Kbps -> video.m3u8\033[0m") {
 		t.Fatalf("expected selected variant highlighting, got %q", list)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -80,10 +81,12 @@ func (m *Master) GetVariantList(selectedIndex int) string {
 			res = "audio-only"
 		}
 
+		bandwidth := strconv.Itoa(variant.Bandwidth/1000) + " Kbps"
+
 		if i == selectedIndex {
-			fmt.Fprintf(output, "\033[0;30;47m%d) %s - %s -> %s\033[0m\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+			fmt.Fprintf(output, "\033[0;30;47m%d) %s - %s -> %s\033[0m\r\n", i+1, res, bandwidth, variant.URL)
 		} else {
-			fmt.Fprintf(output, "%d) %s - %s -> %s\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+			fmt.Fprintf(output, "%d) %s - %s -> %s\r\n", i+1, res, bandwidth, variant.URL)
 		}
 	}
 
@@ -117,6 +120,11 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 				}
 
 				attrs := parseTagAttributes(data)
+				mediaType := strings.TrimSpace(attrs["TYPE"])
+				if mediaType != "" && !strings.EqualFold(mediaType, "AUDIO") {
+					variant = &Variant{}
+					continue
+				}
 
 				if uri, ok := attrs["URI"]; ok {
 					variant.URL = uri
@@ -165,6 +173,10 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 			variant = &Variant{}
 		}
 	}
+
+	sort.SliceStable(variants, func(i, j int) bool {
+		return variants[i].Bandwidth < variants[j].Bandwidth
+	})
 
 	return variants
 }
