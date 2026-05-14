@@ -111,33 +111,23 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 
 			// If this is a media tag then we need to parse it now rather than waiting for the source line.
 			if strings.Index(line, "#EXT-X-MEDIA") == 0 {
-
-				// Get the portion after the media tag
-				data := strings.Split(line, ":")
-
-				// If we don't have something we can parse, just continue
-				if len(data) != 2 {
+				data, ok := tagAttributeData(line)
+				if !ok {
 					continue
 				}
 
-				// Break out the key / value pairs
-				parts := strings.Split(data[1], ",")
+				attrs := parseTagAttributes(data)
 
-				for _, part := range parts {
+				if uri, ok := attrs["URI"]; ok {
+					variant.URL = uri
 
-					kv := strings.Split(part, "=")
-
-					switch kv[0] {
-					case "URI":
-
-						variant.URL = strings.ReplaceAll(kv[1], "\"", "")
-
-						if !strings.Contains(variant.URL, "http") {
-							variant.URL = fmt.Sprintf("%s/%s", rootURL, variant.URL)
-						}
-					case "NAME":
-						variant.Resolution = kv[1]
+					if u, err := url.Parse(variant.URL); err == nil {
+						variant.URL = rootURL.ResolveReference(u).String()
 					}
+				}
+
+				if name, ok := attrs["NAME"]; ok {
+					variant.Resolution = name
 				}
 
 				variants = append(variants, variant)

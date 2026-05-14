@@ -38,32 +38,20 @@ type Variant struct {
 func (v *Variant) Process() {
 	for _, tag := range v.Tags {
 		if strings.Index(tag, streamInf) == 0 {
-			raw := strings.ReplaceAll(tag, streamInf, "")
+			raw := strings.TrimPrefix(tag, streamInf)
+			attrs := parseTagAttributes(raw)
 
-			// Split up the values based on their key=values which are comman delimited
-			parts := strings.Split(raw, ",")
+			if val, ok := attrs["BANDWIDTH"]; ok {
+				i, _ := strconv.Atoi(val)
+				v.Bandwidth = i
+			}
 
-			for _, part := range parts {
-				// Catch the edge case where codes have a comma in the middle of them.
-				if !strings.Contains(part, "=") {
-					v.Codecs = fmt.Sprintf("%s%s", v.Codecs, strings.ReplaceAll(part, "\"", ""))
-					continue
-				}
+			if val, ok := attrs["CODECS"]; ok {
+				v.Codecs = val
+			}
 
-				kv := strings.Split(strings.Trim(part, " "), "=")
-
-				key := kv[0]
-				val := kv[1]
-
-				switch key {
-				case "BANDWIDTH":
-					i, _ := strconv.Atoi(val)
-					v.Bandwidth = i
-				case "CODECS":
-					v.Codecs = strings.ReplaceAll(val, "\"", "")
-				case "RESOLUTION":
-					v.Resolution = val
-				}
+			if val, ok := attrs["RESOLUTION"]; ok {
+				v.Resolution = val
 			}
 		}
 	}
