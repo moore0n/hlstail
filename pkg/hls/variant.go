@@ -52,8 +52,6 @@ func (v *Variant) Process() {
 
 				kv := strings.Split(strings.Trim(part, " "), "=")
 
-				fmt.Println(kv)
-
 				key := kv[0]
 				val := kv[1]
 
