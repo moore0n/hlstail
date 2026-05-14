@@ -73,13 +73,17 @@ func (v *Variant) Process() {
 
 // Get makes the http request to get the latest data.
 func (v *Variant) Get() error {
-	data, err := http.Get(v.URL)
+	data, err := httpClient.Get(v.URL)
 
 	if err != nil {
 		return err
 	}
 
 	defer data.Body.Close()
+
+	if data.StatusCode < http.StatusOK || data.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("unexpected HTTP status getting variant playlist: %s", data.Status)
+	}
 
 	body, err := ioutil.ReadAll(data.Body)
 

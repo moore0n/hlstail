@@ -27,13 +27,17 @@ func NewMaster(url string) *Master {
 
 // Get loads the data into memory to be used later.
 func (m *Master) Get() error {
-	data, err := http.Get(m.url)
+	data, err := httpClient.Get(m.url)
 
 	if err != nil {
 		return err
 	}
 
 	defer data.Body.Close()
+
+	if data.StatusCode < http.StatusOK || data.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("unexpected HTTP status getting master playlist: %s", data.Status)
+	}
 
 	body, err := ioutil.ReadAll(data.Body)
 
