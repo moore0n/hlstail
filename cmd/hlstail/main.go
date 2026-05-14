@@ -2,16 +2,30 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/moore0n/hlstail/pkg/hls"
 	"github.com/moore0n/hlstail/pkg/term"
 	"github.com/moore0n/hlstail/pkg/tools"
 	"github.com/urfave/cli/v2"
+)
+
+var errQuit = errors.New("quit")
+
+type inputCommand int
+
+const (
+	commandPause inputCommand = iota
+	commandResume
+	commandChangeVariant
+	commandQuit
 )
 
 func main() {
@@ -26,20 +40,26 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 
 		playlist := c.Args().Get(0)
+		var variant *int
 
 		// Validate that we have a playlist value.
 		if playlist == "" {
 			cli.ShowAppHelpAndExit(c, 0)
 		}
 
-		return tail(playlist, c.Int("count"), c.Int("interval"), c.Int("variant"))
+		if c.IsSet("variant") {
+			v := c.Int("variant")
+			variant = &v
+		}
+
+		return tail(playlist, c.Int("count"), c.Int("interval"), variant)
 	}
 
 	app.Flags = []cli.Flag{
 		&cli.IntFlag{
 			Name:  "count",
 			Usage: "The number of segments to display",
-			Value: 5,
+			Value: 10,
 		},
 		&cli.IntFlag{
 			Name:  "interval",
@@ -47,9 +67,10 @@ func main() {
 			Value: 3,
 		},
 		&cli.IntFlag{
-			Name:  "variant",
-			Usage: "The number of the variant you'd like to use",
-			Value: 0,
+			Name:        "variant",
+			Usage:       "The zero-based variant index you'd like to use; omit to choose interactively",
+			DefaultText: "interactive",
+			Value:       0,
 		},
 	}
 
@@ -60,7 +81,7 @@ func main() {
 	}
 }
 
-func tail(playlist string, count int, interval int, variant int) error {
+func tail(playlist string, count int, interval int, variant *int) error {
 	termSess := term.NewSession()
 
 	if err := termSess.MakeRaw(); err != nil {
@@ -69,46 +90,86 @@ func tail(playlist string, count int, interval int, variant int) error {
 
 	// Start the new terminal session
 	termSess.Start()
+	defer termSess.End()
+	stopSignals := restoreTerminalOnSignal(termSess)
+	defer stopSignals()
 
 	// Print the loading screen here before we make the request.
-	tools.PrintLoading(termSess.GetCliWidth())
+	width, err := termSess.GetCliWidth()
+	if err != nil {
+		return err
+	}
+	tools.PrintLoading(width)
 
 	// Create a new HLS Session to manage the requests.
 	hls, err := hls.NewSession(playlist)
 
 	if err != nil {
-		termSess.End()
 		return err
 	}
 
 	for {
-		if variant == 0 {
-			variant, err = PollForVariant(termSess, hls)
+		selectedVariant := 0
+
+		if variant == nil {
+			selectedVariant, err = PollForVariant(termSess, hls)
 
 			if err != nil {
-				// (q)uit
-				termSess.End()
-				fmt.Println("error getting master playlist.")
-				os.Exit(0)
+				if errors.Is(err, errQuit) {
+					return nil
+				}
+
+				return err
 			}
+		} else {
+			selectedVariant = *variant
 		}
 
 		// Set the variant that was selected in the previous loop.
-		hls.SetVariant(variant)
+		if err := hls.SetVariant(selectedVariant); err != nil {
+			return err
+		}
 
-		// Run the updates in a go routine but respect the pause state.
-		go updateLoop(termSess, interval, count, hls)
+		commands := make(chan inputCommand, 1)
+
+		// Run the updates in a go routine but respect input commands.
+		go updateLoop(termSess, interval, count, hls, commands)
 
 		// Run the loop to poll input for commands.
-		PollForInput(termSess)
+		if err := PollForInput(commands); err != nil {
+			if errors.Is(err, errQuit) {
+				return nil
+			}
+
+			return err
+		}
 
 		// Reset the variant so that we can prompt for variant selection if the user selects that option
-		variant = 0
+		variant = nil
+	}
+}
+
+func restoreTerminalOnSignal(termSess *term.Session) func() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		if _, ok := <-signals; !ok {
+			return
+		}
+
+		termSess.End()
+		os.Exit(1)
+	}()
+
+	return func() {
+		signal.Stop(signals)
+		close(signals)
 	}
 }
 
 // PollForInput will query the stdin to determine if someone has entered a command
-func PollForInput(termSess *term.Session) {
+func PollForInput(commands chan<- inputCommand) error {
 	// Read the std input
 	reader := bufio.NewReader(os.Stdin)
 
@@ -117,24 +178,25 @@ func PollForInput(termSess *term.Session) {
 		r, _, err := reader.ReadRune()
 
 		if err != nil {
-			break
+			commands <- commandQuit
+			return err
 		}
 
 		switch r {
 		case rune(112):
 			// (p)ause
-			termSess.Paused = true
+			commands <- commandPause
 		case rune(114):
 			// (r)esume
-			termSess.Paused = false
+			commands <- commandResume
 		case rune(99):
 			// (c)hange variant
-			termSess.Reset = true
-			return
+			commands <- commandChangeVariant
+			return nil
 		case rune(113):
 			// (q)uit
-			termSess.End()
-			os.Exit(0)
+			commands <- commandQuit
+			return errQuit
 		}
 	}
 }
@@ -143,10 +205,16 @@ func PollForInput(termSess *term.Session) {
 func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 	selectedIndex := 0
 
-	width := termSess.GetCliWidth()
+	width, err := termSess.GetCliWidth()
+	if err != nil {
+		return 0, err
+	}
 
 	// Get the Master and return the variant list.
-	content := hls.GetMasterPlaylistOptions(width, selectedIndex, true)
+	content, err := hls.GetMasterPlaylistOptions(width, selectedIndex, true)
+	if err != nil {
+		return 0, err
+	}
 
 	// Show the variant list to the user
 	tools.PrintBuffer(content)
@@ -165,14 +233,19 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 		switch r {
 		case rune(113):
 			// (q)uit
-			termSess.End()
-			os.Exit(0)
+			return 0, errQuit
 		case rune(114):
 			// (r)efresh
-			width = termSess.GetCliWidth()
+			width, err = termSess.GetCliWidth()
+			if err != nil {
+				return 0, err
+			}
 			selectedIndex = 0
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			if err != nil {
+				return 0, err
+			}
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
@@ -188,28 +261,40 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 			continue
 		case rune(65):
 			// Up arrow
-			width = termSess.GetCliWidth()
+			width, err = termSess.GetCliWidth()
+			if err != nil {
+				return 0, err
+			}
 
 			if selectedIndex > 0 {
 				selectedIndex--
 			}
 
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			if err != nil {
+				return 0, err
+			}
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
 			continue
 		case rune(66):
 			// Down arrow
-			width = termSess.GetCliWidth()
+			width, err = termSess.GetCliWidth()
+			if err != nil {
+				return 0, err
+			}
 
 			if selectedIndex < len(hls.Master.Variants)-1 {
 				selectedIndex++
 			}
 
 			// Get the Master and return the variant list.
-			content = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
+			if err != nil {
+				return 0, err
+			}
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
@@ -219,58 +304,75 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 }
 
 // updateLoop will query for updates at the supplied interval
-func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Session) {
+func updateLoop(termSess *term.Session, interval int, count int, hls *hls.Session, commands <-chan inputCommand) {
 	var variantInfo string
 	var nextRun int64 = time.Now().Unix()
-	var lastPauseState bool = termSess.Paused
+	var paused bool
+	var lastPauseState bool
 
 	// Loop forever and request updates every n number of seconds.
 	for {
 		// Prevent maxing out the CPU.
 		time.Sleep(time.Millisecond * 50)
 
+		select {
+		case command := <-commands:
+			switch command {
+			case commandPause:
+				paused = true
+			case commandResume:
+				paused = false
+			case commandChangeVariant:
+				// clear the previous segments
+				hls.Variant.Segments = make([][]string, 0)
+				return
+			case commandQuit:
+				return
+			}
+		default:
+		}
+
 		// Check timer and statechange. If we are still paused then don't update the screen.
-		if nextRun > time.Now().Unix() && lastPauseState == termSess.Paused {
+		if nextRun > time.Now().Unix() && lastPauseState == paused {
 			continue
 		}
 
-		/**
-		 *	Handle the reset here, we need to return so this go routine will die
-		 * 	and we can start another one when the user selects a variant.
-		 *  */
-		if termSess.Reset {
-			termSess.Reset = false
-			termSess.Paused = false
-			// clear the previous segments
-			hls.Variant.Segments = make([][]string, 0)
-			return
-		}
-
-		if !termSess.Paused {
-			width := termSess.GetCliWidth()
+		if !paused {
+			width, err := termSess.GetCliWidth()
+			if err != nil {
+				return
+			}
 			variantInfo = hls.GetVariantPrintData(width, count)
 			tools.PrintBuffer(variantInfo)
 		} else {
 
 			// This will print only when the state changes to pause, reduce the wonkiness of redrawing the screen
-			if lastPauseState != termSess.Paused {
-				width := termSess.GetCliWidth()
+			if lastPauseState != paused {
+				width, err := termSess.GetCliWidth()
+				if err != nil {
+					return
+				}
 				parts := strings.Split(variantInfo, "\r\n")
-				end := parts[len(parts)-4]
+				if len(parts) < 4 {
+					continue
+				}
+
+				footerIndex := len(parts) - 4
+				end := parts[footerIndex]
 				end = strings.ReplaceAll(end, "=", "")
 
 				end = strings.Trim(end, " ")
 
 				end = fmt.Sprintf("PAUSED @%s", end)
 
-				parts[len(parts)-4] = tools.PadString(end, width, "=")
+				parts[footerIndex] = tools.PadString(end, width, "=")
 
 				// Trim the pause instructions.
 				tools.PrintBuffer(strings.Join(parts, "\r\n"))
 			}
 		}
 
-		lastPauseState = termSess.Paused
+		lastPauseState = paused
 		nextRun = time.Now().Unix() + int64(interval)
 	}
 }

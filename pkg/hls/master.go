@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -27,7 +28,7 @@ func NewMaster(url string) *Master {
 
 // Get loads the data into memory to be used later.
 func (m *Master) Get() error {
-	data, err := http.Get(m.url)
+	data, err := httpClient.Get(m.url)
 
 	if err != nil {
 		return err
@@ -35,7 +36,11 @@ func (m *Master) Get() error {
 
 	defer data.Body.Close()
 
-	body, err := ioutil.ReadAll(data.Body)
+	if data.StatusCode < http.StatusOK || data.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("unexpected HTTP status getting master playlist: %s", data.Status)
+	}
+
+	body, err := io.ReadAll(data.Body)
 
 	if err != nil {
 		return err
@@ -55,7 +60,7 @@ func (m *Master) Get() error {
 
 // GetVariant returns a Variant struct representing the variant's data.
 func (m *Master) GetVariant(index int) (*Variant, error) {
-	if index > len(m.Variants) || index < 0 {
+	if index >= len(m.Variants) || index < 0 {
 		return nil, errors.New("index out of range")
 	}
 
@@ -76,10 +81,12 @@ func (m *Master) GetVariantList(selectedIndex int) string {
 			res = "audio-only"
 		}
 
+		bandwidth := strconv.Itoa(variant.Bandwidth/1000) + " Kbps"
+
 		if i == selectedIndex {
-			fmt.Fprintf(output, "\033[0;30;47m%d) %s - %s -> %s\033[0m\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+			fmt.Fprintf(output, "\033[0;30;47m%d) %s - %s -> %s\033[0m\r\n", i+1, res, bandwidth, variant.URL)
 		} else {
-			fmt.Fprintf(output, "%d) %s - %s -> %s\r\n", i+1, res, strconv.Itoa(int(variant.Bandwidth)), variant.URL)
+			fmt.Fprintf(output, "%d) %s - %s -> %s\r\n", i+1, res, bandwidth, variant.URL)
 		}
 	}
 
@@ -107,36 +114,28 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 
 			// If this is a media tag then we need to parse it now rather than waiting for the source line.
 			if strings.Index(line, "#EXT-X-MEDIA") == 0 {
-
-				// Get the portion after the media tag
-				data := strings.Split(line, ":")
-
-				// If we don't have something we can parse, just continue
-				if len(data) != 2 {
+				data, ok := tagAttributeData(line)
+				if !ok {
 					continue
 				}
 
-				// Break out the key / value pairs
-				parts := strings.Split(data[1], ",")
+				attrs := parseTagAttributes(data)
+				mediaType := strings.TrimSpace(attrs["TYPE"])
+				if mediaType != "" && !strings.EqualFold(mediaType, "AUDIO") {
+					variant = &Variant{}
+					continue
+				}
 
-				for _, part := range parts {
+				if uri, ok := attrs["URI"]; ok {
+					variant.URL = uri
 
-					kv := strings.Split(part, "=")
-
-					switch kv[0] {
-					case "URI":
-
-						variant.URL = strings.ReplaceAll(kv[1], "\"", "")
-
-						if strings.Index(variant.URL, "http") == -1 {
-							variant.URL = fmt.Sprintf("%s/%s", rootURL, variant.URL)
-						}
-					case "NAME":
-						variant.Resolution = kv[1]
-					default:
-						// Ignore any fields we don't about for now.
-						break
+					if u, err := url.Parse(variant.URL); err == nil {
+						variant.URL = rootURL.ResolveReference(u).String()
 					}
+				}
+
+				if name, ok := attrs["NAME"]; ok {
+					variant.Resolution = name
 				}
 
 				variants = append(variants, variant)
@@ -174,6 +173,10 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 			variant = &Variant{}
 		}
 	}
+
+	sort.SliceStable(variants, func(i, j int) bool {
+		return variants[i].Bandwidth < variants[j].Bandwidth
+	})
 
 	return variants
 }

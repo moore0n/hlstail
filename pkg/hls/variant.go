@@ -2,25 +2,14 @@ package hls
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
 const streamInf = "#EXT-X-STREAM-INF:"
-
-var headerTags = []string{
-	"EXT-X-VERSION",
-	"EXT-X-TARGETDURATION",
-	"EXT-X-MEDIA-SEQUENCE",
-	"EXT-X-DISCONTINUITY-SEQUENCE",
-	"EXT-X-ENDLIST",
-	"EXT-X-PLAYLIST-TYPE",
-	"EXT-X-I-FRAMES-ONLY",
-}
 
 // Variant is a struct for storing data about a variant.
 type Variant struct {
@@ -38,34 +27,20 @@ type Variant struct {
 func (v *Variant) Process() {
 	for _, tag := range v.Tags {
 		if strings.Index(tag, streamInf) == 0 {
-			raw := strings.ReplaceAll(tag, streamInf, "")
+			raw := strings.TrimPrefix(tag, streamInf)
+			attrs := parseTagAttributes(raw)
 
-			// Split up the values based on their key=values which are comman delimited
-			parts := strings.Split(raw, ",")
+			if val, ok := attrs["BANDWIDTH"]; ok {
+				i, _ := strconv.Atoi(val)
+				v.Bandwidth = i
+			}
 
-			for _, part := range parts {
-				// Catch the edge case where codes have a comma in the middle of them.
-				if strings.Index(part, "=") == -1 {
-					v.Codecs = fmt.Sprintf("%s%s", v.Codecs, strings.ReplaceAll(part, "\"", ""))
-					continue
-				}
+			if val, ok := attrs["CODECS"]; ok {
+				v.Codecs = val
+			}
 
-				kv := strings.Split(strings.Trim(part, " "), "=")
-
-				fmt.Println(kv)
-
-				key := kv[0]
-				val := kv[1]
-
-				switch key {
-				case "BANDWIDTH":
-					i, _ := strconv.Atoi(val)
-					v.Bandwidth = i
-				case "CODECS":
-					v.Codecs = strings.ReplaceAll(val, "\"", "")
-				case "RESOLUTION":
-					v.Resolution = val
-				}
+			if val, ok := attrs["RESOLUTION"]; ok {
+				v.Resolution = val
 			}
 		}
 	}
@@ -73,7 +48,7 @@ func (v *Variant) Process() {
 
 // Get makes the http request to get the latest data.
 func (v *Variant) Get() error {
-	data, err := http.Get(v.URL)
+	data, err := httpClient.Get(v.URL)
 
 	if err != nil {
 		return err
@@ -81,7 +56,11 @@ func (v *Variant) Get() error {
 
 	defer data.Body.Close()
 
-	body, err := ioutil.ReadAll(data.Body)
+	if data.StatusCode < http.StatusOK || data.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("unexpected HTTP status getting variant playlist: %s", data.Status)
+	}
+
+	body, err := io.ReadAll(data.Body)
 
 	if err != nil {
 		return err
@@ -100,7 +79,7 @@ func (v *Variant) Refresh() error {
 
 	// Get new information
 	if err := v.Get(); err != nil {
-		return errors.New("Unable to get segments")
+		return fmt.Errorf("unable to get segments: %w", err)
 	}
 
 	return nil
@@ -108,6 +87,10 @@ func (v *Variant) Refresh() error {
 
 // GetHeaderTagsToPrint returns a the header tags for printing.
 func (v *Variant) GetHeaderTagsToPrint() string {
+	if len(v.Segments) == 0 {
+		return ""
+	}
+
 	// Get the first segment which would also hold the header data.
 	headSegment := filterHeadTags(v.Segments[0])
 
@@ -148,13 +131,18 @@ func (v *Variant) GetHeaderTagsToPrint() string {
 
 // GetSegmentsToPrint compiles the text list of segments to print.
 func (v *Variant) GetSegmentsToPrint(count int) string {
+	if count <= 0 || len(v.Segments) == 0 {
+		return ""
+	}
+
 	// Prevent out of range errors.
 	if count > len(v.Segments) {
 		count = len(v.Segments)
 	}
 
 	// Trim to the segments to the count that the user requested.
-	segments := v.Segments[len(v.Segments)-count:]
+	start := len(v.Segments) - count
+	segments := v.Segments[start:]
 
 	// Build a buffer to manage appending the text.
 	output := new(bytes.Buffer)
@@ -162,6 +150,11 @@ func (v *Variant) GetSegmentsToPrint(count int) string {
 	// Check the segments and colorize the new segments.
 	for i := 0; i < len(segments); i++ {
 		color := ""
+		segment := segments[i]
+
+		if start+i == 0 {
+			segment = stripHeadTags(segment)
+		}
 
 		if !segmentExists(v.previousSegments, segments[i]) {
 			color = "\033[38;5;40m"
@@ -170,7 +163,7 @@ func (v *Variant) GetSegmentsToPrint(count int) string {
 			color = "\033[38;5;250m"
 		}
 
-		fmt.Fprintf(output, "\r\n%s%s\033[0m\r\n", color, strings.Join(segments[i], "\r\n"))
+		fmt.Fprintf(output, "\r\n%s%s\033[0m\r\n", color, strings.Join(segment, "\r\n"))
 	}
 
 	return output.String()
@@ -232,33 +225,31 @@ func segmentExists(prev [][]string, elem []string) bool {
 
 // Use the first segment and pull out the header specific tags to print.
 func filterHeadTags(segment []string) []string {
-
 	result := make([]string, 0)
 
-	// Loop over each line for this segment.
 	for _, line := range segment {
-		parts := strings.Split(line, ":")
-		// ignore invalid tags.
-		if len(parts) != 2 {
-			continue
+		if !strings.HasPrefix(line, "#") || strings.HasPrefix(line, "#EXTINF") {
+			break
 		}
 
-		tag := strings.Replace(parts[0], "#", "", -1)
-
-		// Compare this tag to each of the tags in the header tags slice.
-		for _, allowedTag := range headerTags {
-			if tag == allowedTag {
-				result = append(result, line)
-			}
-		}
+		result = append(result, line)
 	}
 
 	return result
 }
 
+func stripHeadTags(segment []string) []string {
+	headTags := filterHeadTags(segment)
+	if len(headTags) == 0 {
+		return segment
+	}
+
+	return segment[len(headTags):]
+}
+
 func filterSegmentSource(segment []string) string {
 	for _, val := range segment {
-		if strings.Index(val, "#") < 0 {
+		if !strings.Contains(val, "#") {
 			return val
 		}
 	}
