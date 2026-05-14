@@ -9,7 +9,7 @@ import (
 
 // PrintBuffer prints the value of val to stdout
 func PrintBuffer(val interface{}) {
-	fmt.Printf("\033[1;1H\033[0J%v", val)
+	fmt.Printf("\033[1;1H\033[0J\r\n\r\n%v", val)
 }
 
 // PadString returns a new padded string

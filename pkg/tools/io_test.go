@@ -41,7 +41,7 @@ func TestPrintBufferAndPrintLoading(t *testing.T) {
 		PrintBuffer("hello")
 	})
 
-	if printed != "\033[1;1H\033[0Jhello" {
+	if printed != "\033[1;1H\033[0J\r\n\r\nhello" {
 		t.Fatalf("unexpected print buffer output %q", printed)
 	}
 

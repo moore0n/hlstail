@@ -11,16 +11,6 @@ import (
 
 const streamInf = "#EXT-X-STREAM-INF:"
 
-var headerTags = []string{
-	"EXT-X-VERSION",
-	"EXT-X-TARGETDURATION",
-	"EXT-X-MEDIA-SEQUENCE",
-	"EXT-X-DISCONTINUITY-SEQUENCE",
-	"EXT-X-ENDLIST",
-	"EXT-X-PLAYLIST-TYPE",
-	"EXT-X-I-FRAMES-ONLY",
-}
-
 // Variant is a struct for storing data about a variant.
 type Variant struct {
 	Tags             []string
@@ -151,7 +141,8 @@ func (v *Variant) GetSegmentsToPrint(count int) string {
 	}
 
 	// Trim to the segments to the count that the user requested.
-	segments := v.Segments[len(v.Segments)-count:]
+	start := len(v.Segments) - count
+	segments := v.Segments[start:]
 
 	// Build a buffer to manage appending the text.
 	output := new(bytes.Buffer)
@@ -159,6 +150,11 @@ func (v *Variant) GetSegmentsToPrint(count int) string {
 	// Check the segments and colorize the new segments.
 	for i := 0; i < len(segments); i++ {
 		color := ""
+		segment := segments[i]
+
+		if start+i == 0 {
+			segment = stripHeadTags(segment)
+		}
 
 		if !segmentExists(v.previousSegments, segments[i]) {
 			color = "\033[38;5;40m"
@@ -167,7 +163,7 @@ func (v *Variant) GetSegmentsToPrint(count int) string {
 			color = "\033[38;5;250m"
 		}
 
-		fmt.Fprintf(output, "\r\n%s%s\033[0m\r\n", color, strings.Join(segments[i], "\r\n"))
+		fmt.Fprintf(output, "\r\n%s%s\033[0m\r\n", color, strings.Join(segment, "\r\n"))
 	}
 
 	return output.String()
@@ -229,28 +225,26 @@ func segmentExists(prev [][]string, elem []string) bool {
 
 // Use the first segment and pull out the header specific tags to print.
 func filterHeadTags(segment []string) []string {
-
 	result := make([]string, 0)
 
-	// Loop over each line for this segment.
 	for _, line := range segment {
-		parts := strings.Split(line, ":")
-		// ignore invalid tags.
-		if len(parts) != 2 {
-			continue
+		if !strings.HasPrefix(line, "#") || strings.HasPrefix(line, "#EXTINF") {
+			break
 		}
 
-		tag := strings.Replace(parts[0], "#", "", -1)
-
-		// Compare this tag to each of the tags in the header tags slice.
-		for _, allowedTag := range headerTags {
-			if tag == allowedTag {
-				result = append(result, line)
-			}
-		}
+		result = append(result, line)
 	}
 
 	return result
+}
+
+func stripHeadTags(segment []string) []string {
+	headTags := filterHeadTags(segment)
+	if len(headTags) == 0 {
+		return segment
+	}
+
+	return segment[len(headTags):]
 }
 
 func filterSegmentSource(segment []string) string {

@@ -393,7 +393,7 @@ func TestAttributeHelpers(t *testing.T) {
 func TestSegmentHelpersAndPrinting(t *testing.T) {
 	variant := &Variant{
 		Segments: [][]string{
-			{"#EXT-X-TARGETDURATION:4", "#EXTINF:4.0,", "old.ts"},
+			{"#EXTM3U", "#EXT-X-TARGETDURATION:4", "#EXT-X-CUSTOM-TAG:yes", "#EXTINF:4.0,", "old.ts"},
 			{"#EXTINF:4.0,", "new.ts"},
 		},
 		previousSegments: [][]string{{"#EXTINF:4.0,", "old.ts"}},
@@ -412,12 +412,24 @@ func TestSegmentHelpersAndPrinting(t *testing.T) {
 	}
 
 	header := variant.GetHeaderTagsToPrint()
-	if !strings.Contains(header, "#EXT-X-TARGETDURATION:4") {
+	if !strings.Contains(header, "#EXTM3U") || !strings.Contains(header, "#EXT-X-CUSTOM-TAG:yes") {
 		t.Fatalf("expected header tag output, got %q", header)
+	}
+
+	if strings.Contains(header, "#EXTINF:4.0,") {
+		t.Fatalf("expected segment tag to stay out of header output, got %q", header)
 	}
 
 	segments := variant.GetSegmentsToPrint(5)
 	if !strings.Contains(segments, "old.ts") || !strings.Contains(segments, "new.ts") {
 		t.Fatalf("expected segment output, got %q", segments)
+	}
+
+	if strings.Contains(segments, "#EXTM3U") || strings.Contains(segments, "#EXT-X-CUSTOM-TAG:yes") {
+		t.Fatalf("expected header tags to stay out of segment output, got %q", segments)
+	}
+
+	if !strings.Contains(segments, "#EXTINF:4.0,") {
+		t.Fatalf("expected segment tags to remain in segment output, got %q", segments)
 	}
 }
