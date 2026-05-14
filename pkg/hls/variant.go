@@ -45,7 +45,7 @@ func (v *Variant) Process() {
 
 			for _, part := range parts {
 				// Catch the edge case where codes have a comma in the middle of them.
-				if strings.Index(part, "=") == -1 {
+				if !strings.Contains(part, "=") {
 					v.Codecs = fmt.Sprintf("%s%s", v.Codecs, strings.ReplaceAll(part, "\"", ""))
 					continue
 				}
@@ -270,7 +270,7 @@ func filterHeadTags(segment []string) []string {
 
 func filterSegmentSource(segment []string) string {
 	for _, val := range segment {
-		if strings.Index(val, "#") < 0 {
+		if !strings.Contains(val, "#") {
 			return val
 		}
 	}

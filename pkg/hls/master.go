@@ -132,14 +132,11 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 
 						variant.URL = strings.ReplaceAll(kv[1], "\"", "")
 
-						if strings.Index(variant.URL, "http") == -1 {
+						if !strings.Contains(variant.URL, "http") {
 							variant.URL = fmt.Sprintf("%s/%s", rootURL, variant.URL)
 						}
 					case "NAME":
 						variant.Resolution = kv[1]
-					default:
-						// Ignore any fields we don't about for now.
-						break
 					}
 				}
 
