@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/moore0n/hlstail/pkg/hls"
@@ -80,6 +82,8 @@ func tail(playlist string, count int, interval int, variant *int) error {
 	// Start the new terminal session
 	termSess.Start()
 	defer termSess.End()
+	stopSignals := restoreTerminalOnSignal(termSess)
+	defer stopSignals()
 
 	// Print the loading screen here before we make the request.
 	width, err := termSess.GetCliWidth()
@@ -132,6 +136,25 @@ func tail(playlist string, count int, interval int, variant *int) error {
 
 		// Reset the variant so that we can prompt for variant selection if the user selects that option
 		variant = nil
+	}
+}
+
+func restoreTerminalOnSignal(termSess *term.Session) func() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		if _, ok := <-signals; !ok {
+			return
+		}
+
+		termSess.End()
+		os.Exit(1)
+	}()
+
+	return func() {
+		signal.Stop(signals)
+		close(signals)
 	}
 }
 
