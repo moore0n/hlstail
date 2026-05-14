@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -85,7 +85,7 @@ func (v *Variant) Get() error {
 		return fmt.Errorf("unexpected HTTP status getting variant playlist: %s", data.Status)
 	}
 
-	body, err := ioutil.ReadAll(data.Body)
+	body, err := io.ReadAll(data.Body)
 
 	if err != nil {
 		return err

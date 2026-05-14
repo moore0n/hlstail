@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -39,7 +39,7 @@ func (m *Master) Get() error {
 		return fmt.Errorf("unexpected HTTP status getting master playlist: %s", data.Status)
 	}
 
-	body, err := ioutil.ReadAll(data.Body)
+	body, err := io.ReadAll(data.Body)
 
 	if err != nil {
 		return err
