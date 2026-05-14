@@ -55,7 +55,7 @@ func (m *Master) Get() error {
 
 // GetVariant returns a Variant struct representing the variant's data.
 func (m *Master) GetVariant(index int) (*Variant, error) {
-	if index > len(m.Variants) || index < 0 {
+	if index >= len(m.Variants) || index < 0 {
 		return nil, errors.New("index out of range")
 	}
 
