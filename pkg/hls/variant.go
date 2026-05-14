@@ -108,6 +108,10 @@ func (v *Variant) Refresh() error {
 
 // GetHeaderTagsToPrint returns a the header tags for printing.
 func (v *Variant) GetHeaderTagsToPrint() string {
+	if len(v.Segments) == 0 {
+		return ""
+	}
+
 	// Get the first segment which would also hold the header data.
 	headSegment := filterHeadTags(v.Segments[0])
 
@@ -148,6 +152,10 @@ func (v *Variant) GetHeaderTagsToPrint() string {
 
 // GetSegmentsToPrint compiles the text list of segments to print.
 func (v *Variant) GetSegmentsToPrint(count int) string {
+	if count <= 0 || len(v.Segments) == 0 {
+		return ""
+	}
+
 	// Prevent out of range errors.
 	if count > len(v.Segments) {
 		count = len(v.Segments)
