@@ -26,13 +26,19 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 
 		playlist := c.Args().Get(0)
+		var variant *int
 
 		// Validate that we have a playlist value.
 		if playlist == "" {
 			cli.ShowAppHelpAndExit(c, 0)
 		}
 
-		return tail(playlist, c.Int("count"), c.Int("interval"), c.Int("variant"))
+		if c.IsSet("variant") {
+			v := c.Int("variant")
+			variant = &v
+		}
+
+		return tail(playlist, c.Int("count"), c.Int("interval"), variant)
 	}
 
 	app.Flags = []cli.Flag{
@@ -47,9 +53,10 @@ func main() {
 			Value: 3,
 		},
 		&cli.IntFlag{
-			Name:  "variant",
-			Usage: "The number of the variant you'd like to use",
-			Value: 0,
+			Name:        "variant",
+			Usage:       "The zero-based variant index you'd like to use; omit to choose interactively",
+			DefaultText: "interactive",
+			Value:       0,
 		},
 	}
 
@@ -60,7 +67,7 @@ func main() {
 	}
 }
 
-func tail(playlist string, count int, interval int, variant int) error {
+func tail(playlist string, count int, interval int, variant *int) error {
 	termSess := term.NewSession()
 
 	if err := termSess.MakeRaw(); err != nil {
@@ -82,8 +89,10 @@ func tail(playlist string, count int, interval int, variant int) error {
 	}
 
 	for {
-		if variant == 0 {
-			variant, err = PollForVariant(termSess, hls)
+		selectedVariant := 0
+
+		if variant == nil {
+			selectedVariant, err = PollForVariant(termSess, hls)
 
 			if err != nil {
 				// (q)uit
@@ -91,10 +100,14 @@ func tail(playlist string, count int, interval int, variant int) error {
 				fmt.Println("error getting master playlist.")
 				os.Exit(0)
 			}
+		} else {
+			selectedVariant = *variant
 		}
 
 		// Set the variant that was selected in the previous loop.
-		hls.SetVariant(variant)
+		if err := hls.SetVariant(selectedVariant); err != nil {
+			return err
+		}
 
 		// Run the updates in a go routine but respect the pause state.
 		go updateLoop(termSess, interval, count, hls)
@@ -103,7 +116,7 @@ func tail(playlist string, count int, interval int, variant int) error {
 		PollForInput(termSess)
 
 		// Reset the variant so that we can prompt for variant selection if the user selects that option
-		variant = 0
+		variant = nil
 	}
 }
 

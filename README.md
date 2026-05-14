@@ -22,7 +22,7 @@ COMMANDS:
 GLOBAL OPTIONS:
    --count value     The number of segments to display (default: 5)
    --interval value  The number of seconds to wait between updates (default: 3)
-   --variant value   The number of the variant you'd like to use (default: 0)
+   --variant value   The zero-based variant index you'd like to use; omit to choose interactively (default: interactive)
    --help, -h        show help
    --version, -v     print the version
 ```

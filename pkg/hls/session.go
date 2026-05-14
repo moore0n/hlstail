@@ -56,8 +56,14 @@ func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, show
 }
 
 // SetVariant sets the variant used for requesting data
-func (sess *Session) SetVariant(index int) {
-	sess.Variant = sess.Master.Variants[index]
+func (sess *Session) SetVariant(index int) error {
+	variant, err := sess.Master.GetVariant(index)
+	if err != nil {
+		return err
+	}
+
+	sess.Variant = variant
+	return nil
 }
 
 // GetVariantPrintData return the last n segments of a variant.
