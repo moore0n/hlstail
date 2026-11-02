@@ -146,24 +146,15 @@ func parseVariants(rootURL *url.URL, rawData string) []*Variant {
 			}
 		} else {
 
-			// Parse the url, and then apply the protocol and host from the parent.
+			// Parse the url, and then resolve it relative to the parent.
+			// ResolveReference correctly handles relative paths, including
+			// those with one or more ../ segments.
 			u, err := url.Parse(line)
 			if err != nil {
 				variant.URL = "invalid-url"
+			} else {
+				variant.URL = rootURL.ResolveReference(u).String()
 			}
-
-			// Here we want to fill in the blanks if the provided url is relative.
-			if u.Host == "" {
-				u.Host = rootURL.Host
-				rootPath := strings.Split(rootURL.Path, "/")
-				u.Path = fmt.Sprintf("%s/%s", strings.Join(rootPath[:len(rootPath)-1], "/"), u.Path)
-			}
-
-			if u.Scheme == "" {
-				u.Scheme = rootURL.Scheme
-			}
-
-			variant.URL = u.String()
 
 			variant.Process()
 

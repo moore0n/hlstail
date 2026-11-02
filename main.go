@@ -270,11 +270,8 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 				selectedIndex--
 			}
 
-			// Get the Master and return the variant list.
-			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
-			if err != nil {
-				return 0, err
-			}
+			// Re-render the existing variant list without re-fetching.
+			content = hls.RenderMasterPlaylistOptions(width, selectedIndex)
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input
@@ -290,11 +287,8 @@ func PollForVariant(termSess *term.Session, hls *hls.Session) (int, error) {
 				selectedIndex++
 			}
 
-			// Get the Master and return the variant list.
-			content, err = hls.GetMasterPlaylistOptions(width, selectedIndex, false)
-			if err != nil {
-				return 0, err
-			}
+			// Re-render the existing variant list without re-fetching.
+			content = hls.RenderMasterPlaylistOptions(width, selectedIndex)
 			// Reprint the variant list.
 			tools.PrintBuffer(content)
 			// Continue to monitor user input

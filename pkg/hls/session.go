@@ -30,7 +30,10 @@ func NewSession(URL string) (*Session, error) {
 	return sess, nil
 }
 
-// GetMasterPlaylistOptions return the possible playlist options.
+// GetMasterPlaylistOptions re-fetches the master playlist and returns the
+// possible playlist options. Use this for the initial load and on refresh.
+// For navigation between options, use RenderMasterPlaylistOptions so we don't
+// issue a new request (and pick up rotating tokens/URLs) on every keypress.
 func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, showLoading bool) (string, error) {
 	sess.Master = NewMaster(sess.URL)
 
@@ -43,6 +46,13 @@ func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, show
 		return "", fmt.Errorf("error getting master playlist: %w", err)
 	}
 
+	return sess.RenderMasterPlaylistOptions(width, selectedIndex), nil
+}
+
+// RenderMasterPlaylistOptions renders the already-fetched master playlist
+// options with the given selection. It does not make any network requests, so
+// the variant URLs stay stable as the user navigates the list.
+func (sess *Session) RenderMasterPlaylistOptions(width int, selectedIndex int) string {
 	output := new(bytes.Buffer)
 
 	fmt.Fprint(output, tools.GetHeader(width, " Select a variant"), "\r\n")
@@ -51,7 +61,7 @@ func (sess *Session) GetMasterPlaylistOptions(width int, selectedIndex int, show
 
 	fmt.Fprint(output, "\r\nactions: (enter)select variant (q)uit (r)efresh\r\n")
 
-	return output.String(), nil
+	return output.String()
 }
 
 // SetVariant sets the variant used for requesting data

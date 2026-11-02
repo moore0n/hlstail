@@ -152,6 +152,27 @@ func TestParseVariantsResolvesStreamURIAndProcessesAttributes(t *testing.T) {
 	}
 }
 
+func TestParseVariantsResolvesRelativeStreamURIWithParentSegments(t *testing.T) {
+	rootURL, err := url.Parse("https://example.com/live/hls/v1/master.m3u8")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	variants := parseVariants(rootURL, strings.Join([]string{
+		"#EXTM3U",
+		`#EXT-X-STREAM-INF:BANDWIDTH=2560000,RESOLUTION=1920x1080`,
+		"../../streams/high.m3u8",
+	}, "\n"))
+
+	if len(variants) != 1 {
+		t.Fatalf("expected 1 variant, got %d", len(variants))
+	}
+
+	if got := variants[0].URL; got != "https://example.com/live/streams/high.m3u8" {
+		t.Fatalf("expected resolved stream URL, got %q", got)
+	}
+}
+
 func TestParseVariantsSortsByBandwidth(t *testing.T) {
 	rootURL, err := url.Parse("https://example.com/live/master.m3u8")
 	if err != nil {
